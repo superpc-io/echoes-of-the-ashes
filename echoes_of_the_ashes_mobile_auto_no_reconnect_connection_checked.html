@@ -1,0 +1,2511 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECHOES OF THE ASHES - 灰燼の遺言 -</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PeerJS for P2P Online -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Noto+Serif+JP:wght@600;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Serif JP', serif;
+            background-color: #090a0f;
+            color: #e2e8f0;
+            user-select: none;
+        }
+        .font-cinzel { font-family: 'Cinzel', serif; }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        /* Rarity borders */
+        .rarity-common { border-color: #94a3b8; box-shadow: 0 0 10px rgba(148, 163, 184, 0.15); }
+        .rarity-rare { border-color: #38bdf8; box-shadow: 0 0 12px rgba(56, 189, 248, 0.3); }
+        .rarity-epic { border-color: #c084fc; box-shadow: 0 0 16px rgba(192, 132, 252, 0.4); }
+        .rarity-legendary { border-color: #fbbf24; box-shadow: 0 0 22px rgba(251, 191, 36, 0.6); }
+        .rarity-mythic { border-color: #fb7185; box-shadow: 0 0 26px rgba(244, 63, 94, 0.65), inset 0 0 10px rgba(244, 63, 94, 0.12); }
+
+        @keyframes bloodPulse {
+            0% { background-color: rgba(153, 27, 27, 0); }
+            50% { background-color: rgba(153, 27, 27, 0.5); }
+            100% { background-color: rgba(153, 27, 27, 0); }
+        }
+        .blood-flash { animation: bloodPulse 0.8s ease-in-out; }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.5); border-radius: 3px; }
+    
+        /* スマホ向けレイアウト */
+        body.force-mobile { font-size: 14px; }
+        body.force-mobile main { padding: 8px !important; justify-content: flex-start !important; }
+        body.force-mobile #screen-lobby, body.force-mobile #screen-waiting { padding: 16px !important; border-radius: 18px !important; }
+        body.force-mobile #players-board { grid-template-columns: repeat(2,minmax(0,1fr)) !important; gap: 7px !important; }
+        body.force-mobile #players-board > div { padding: 10px !important; min-width: 0; }
+        body.force-mobile #hand-cards-container { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+        body.force-mobile #screen-game .h-\[520px\] { height: 300px !important; }
+        body.force-mobile #modal-vote > div, body.force-mobile #modal-role > div { max-height: 88dvh; overflow-y: auto; padding: 16px !important; }
+        body.force-mobile #modal-notice > div { max-height: 88dvh; overflow-y: auto; padding: 18px !important; }
+        @media (max-width: 640px) {
+            #modal-notice > div { max-height: 88dvh; overflow-y: auto; padding: 18px !important; }
+            body { font-size: 14px; }
+            main { padding: 8px !important; justify-content: flex-start !important; }
+            #screen-lobby, #screen-waiting { padding: 16px !important; border-radius: 18px !important; }
+            #screen-game { gap: 10px !important; }
+            #screen-game .glass-panel { padding: 11px !important; border-radius: 14px !important; }
+            #screen-game > .glass-panel:first-child { gap: 8px !important; }
+            #screen-game > .glass-panel:first-child > div { width: 100%; }
+            #screen-game > .glass-panel:first-child .flex.items-center.gap-6 { justify-content: space-between; }
+            #players-board { grid-template-columns: repeat(2, minmax(0,1fr)) !important; gap: 7px !important; }
+            #players-board > div { padding: 10px !important; min-width: 0; }
+            #players-board .text-xs { font-size: 11px !important; }
+            #hand-cards-container { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+            #screen-game .lg\:col-span-2 { min-width: 0; }
+            #screen-game .h-\[520px\] { height: 300px !important; }
+            #accusation-report-list { max-height: 45vh !important; }
+            #modal-vote > div, #modal-role > div { max-height: 88dvh; overflow-y: auto; padding: 16px !important; }
+            #vote-candidates button { min-height: 46px; }
+            header { padding-left: 10px !important; padding-right: 10px !important; }
+        }
+        @media (max-width: 380px) {
+            #players-board { grid-template-columns: 1fr !important; }
+            #current-phase-display { font-size: 11px !important; }
+        }
+</style>
+</head>
+<body class="min-h-screen flex flex-col justify-between overflow-x-hidden relative">
+
+    <!-- Fog Background Overlay -->
+    <div class="fixed inset-0 pointer-events-none z-0 opacity-25 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-amber-900/30 via-slate-950 to-black"></div>
+
+    <!-- HEADER / TOP NAV -->
+    <header class="relative z-10 w-full px-6 py-4 glass-panel flex justify-between items-center border-b border-slate-800">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-fire-flame-curved text-amber-500 text-2xl animate-pulse"></i>
+            <div>
+                <h1 class="text-xl font-bold font-cinzel tracking-wider bg-gradient-to-r from-amber-200 via-rose-300 to-amber-500 bg-clip-text text-transparent">ECHOES OF THE ASHES</h1>
+                <p class="text-[10px] text-slate-400 tracking-widest uppercase">灰燼の遺言 - Online Card Battle</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button id="mobile-mode-toggle" onclick="toggleMobileMode()" class="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-[10px] font-bold text-sky-200">スマホモード 自動</button>
+        </div>
+        <div id="room-status-badge" class="hidden flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/90 border border-amber-500/40 text-xs text-amber-300 font-mono">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <span>ROOM: <strong id="display-room-id" class="text-white select-all">------</strong></span>
+            <span id="network-status-indicator" class="text-[10px] text-emerald-300 border-l border-slate-700 pl-2">接続準備中</span>
+            <button id="room-invite-copy-button" onclick="copyRoomInviteLink()" class="ml-1 px-2 py-1 rounded bg-amber-700/80 hover:bg-amber-600 text-white font-sans text-[10px]" title="招待リンクをコピー"><i class="fa-solid fa-link mr-1"></i>招待リンク</button>
+        </div>
+    </header>
+
+
+
+    <!-- MAIN CONTAINER -->
+    <main class="relative z-10 flex-1 max-w-6xl w-full mx-auto p-4 flex flex-col justify-center">
+
+        <!-- LOBBY SCREEN -->
+        <div id="screen-lobby" class="w-full max-w-xl mx-auto glass-panel p-8 rounded-3xl border border-slate-800 shadow-2xl text-center space-y-6">
+            <div class="space-y-2">
+                <span class="px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-full text-xs font-semibold tracking-wider">ONLINE MULTIPLAYER</span>
+                <h2 class="text-3xl font-bold text-slate-100 font-cinzel">儀式への参列</h2>
+                <p class="text-xs text-slate-400">正体隠匿 ✕ 遺言継承カードバトル（4〜18名）</p>
+                <p class="text-[11px] text-slate-500 leading-relaxed">役職を隠して議論し、使徒を追放せよ。オンラインはホストを含め4〜18人。一人用AIモードはあなた＋AI17人の18人戦。人数に応じて人狼陣営の人数も増加。議論は30秒、処刑（投票による追放）は2ターンに1回。99カードは1回のドローにつき10%で出現（1試合最大1枚）。人狼陣営は人狼・キラーボム・デスOF10AM・ピーポーrun・黒魔術師の5種。デスナインティーナインは99カード所持者の死亡時に起動。</p>
+            </div>
+
+            <div class="space-y-4 text-left">
+                <div>
+                    <label class="text-xs text-slate-300 font-bold block mb-1">プレイヤー名</label>
+                    <input type="text" id="input-player-name" maxlength="12" placeholder="名前を入力..." class="w-full px-4 py-3 bg-slate-950/80 border border-slate-800 rounded-xl text-amber-100 focus:outline-none focus:border-amber-500 text-sm">
+                </div>
+
+                <div class="rounded-xl border border-amber-900/50 bg-slate-950/60 p-3">
+                    <label for="wolf-count-setting" class="block text-xs font-bold text-amber-200 mb-2">人狼陣営の人数（ホスト設定）</label>
+                    <select id="wolf-count-setting" class="w-full rounded-lg bg-slate-900 border border-slate-700 text-amber-100 p-3 text-sm">
+                        <option value="1">1人</option><option value="2" selected>2人</option><option value="3">3人</option><option value="4">4人</option><option value="5">5人</option>
+                    </select>
+                    <p class="text-[10px] text-slate-500 mt-1">人狼・キラーボム・デスOF10AM・ピーポーrun・黒魔術師から重複なしで配役します。</p>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="createRoom()" class="w-full py-4 bg-gradient-to-r from-amber-700 to-amber-600 hover:from-amber-600 hover:to-amber-500 text-white font-bold rounded-xl shadow-lg transition-all transform active:scale-95 flex flex-col items-center justify-center gap-1">
+                        <i class="fa-solid fa-dungeon text-lg"></i>
+                        <span class="text-xs">部屋を開く (HOST)</span>
+                    </button>
+                    <div class="space-y-2">
+                        <input type="text" id="input-room-id" placeholder="IDを入力..." class="w-full px-3 py-2 bg-slate-950/80 border border-slate-800 rounded-xl text-amber-100 focus:outline-none focus:border-sky-500 text-xs text-center font-mono">
+                        <button onclick="joinRoom()" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-right-to-bracket"></i>
+                            <span>参加する</span>
+                        </button>
+                    </div>
+                </div>
+
+                <p id="invite-link-hint" class="hidden text-[11px] text-sky-300 text-center bg-sky-950/30 border border-sky-900/50 rounded-lg p-2">招待リンクを読み込みました。名前を確認して「参加する」を押してください。</p>
+
+
+                <div class="relative flex py-2 items-center">
+                    <div class="flex-grow border-t border-slate-800"></div>
+                    <span class="flex-shrink mx-4 text-slate-600 text-[10px]">OR TEST MODE</span>
+                    <div class="flex-grow border-t border-slate-800"></div>
+                </div>
+
+                <button onclick="startTestMode()" class="w-full py-3 bg-slate-900 hover:bg-slate-800 border border-rose-900/50 hover:border-rose-500 text-rose-300 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow-inner">
+                    <i class="fa-solid fa-vial text-rose-400"></i>
+                    <span>【一人用AIモード】あなた＋AI17人（計18人）</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- WAITING ROOM SCREEN -->
+        <div id="screen-waiting" class="hidden w-full max-w-xl mx-auto glass-panel p-8 rounded-3xl border border-slate-800 shadow-2xl space-y-6">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+                <div>
+                    <h3 class="text-xl font-bold text-amber-200 font-cinzel">待合室 (LOBBY)</h3>
+                    <p class="text-xs text-slate-400">参加者が揃うのを待っています</p>
+                </div>
+                <div class="text-right">
+                    <span class="text-xs text-slate-400">参加人数（ホストを含む）</span>
+                    <div class="text-2xl font-bold font-mono text-amber-400"><span id="current-wait-count">1</span> / 18</div>
+                </div>
+            </div>
+
+            <div id="room-members-list" class="space-y-2 min-h-[120px] max-h-[200px] overflow-y-auto p-2 bg-slate-950/60 rounded-xl border border-slate-900">
+                <!-- Members list populated via JS -->
+            </div>
+
+            <div id="member-count-warning" class="p-3 bg-rose-950/40 border border-rose-900/50 rounded-xl text-rose-300 text-xs flex items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>対戦開始には<strong>最低 4 名</strong>のプレイヤーが必要です。最大18名（ホストを含む）。</span>
+            </div>
+
+            <div class="flex gap-4">
+                <button onclick="leaveRoom()" class="w-1/3 py-3 bg-slate-900 hover:bg-slate-800 text-slate-400 font-bold rounded-xl text-xs transition-all">
+                    退室する
+                </button>
+                <button id="btn-start-online" onclick="startOnlineGame()" disabled class="flex-1 py-3 bg-gradient-to-r from-amber-600 to-amber-500 disabled:opacity-40 disabled:cursor-not-allowed hover:from-amber-500 hover:to-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-lg">
+                    対戦を開始する
+                </button>
+            </div>
+        </div>
+
+        <!-- MAIN GAME SCREEN -->
+        <div id="screen-game" class="hidden w-full space-y-4">
+            
+            <!-- GAME STATUS BAR -->
+            <div class="glass-panel p-4 rounded-2xl flex flex-wrap justify-between items-center gap-4 border border-slate-800">
+                <div class="flex items-center gap-4">
+                    <div class="px-4 py-2 bg-slate-950 rounded-xl border border-amber-500/30 text-center">
+                        <span class="text-[10px] text-slate-500 block uppercase tracking-wider">PHASE</span>
+                        <span id="current-phase-display" class="text-sm font-bold text-amber-400 font-cinzel">----</span>
+                    </div>
+                    <div>
+                        <div id="phase-instruction" class="text-xs font-semibold text-slate-200">指示を待っています...</div>
+                        <div class="text-[10px] text-slate-400">生存者: <span id="alive-count" class="text-amber-300 font-bold">0</span> 名 <span class="mx-1 text-slate-700">|</span> TURN: <span id="turn-number" class="text-sky-300 font-bold">0</span></div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-6">
+                    <div class="text-center">
+                        <span class="text-[10px] text-slate-500 block">REMAINING TIME</span>
+                        <div class="text-xl font-mono font-bold text-rose-400"><span id="timer-sec">--</span>s</div>
+                    </div>
+                    <button id="btn-phase-action" onclick="requestNextPhase()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs rounded-xl shadow transition-all">
+                        次へ進む
+                    </button>
+                </div>
+            </div>
+
+            <section id="my-role-panel" class="glass-panel p-3 rounded-2xl border border-sky-500/40 flex items-center justify-between gap-3">
+                <div class="min-w-0"><div class="text-[10px] text-sky-300 font-bold tracking-wider">YOUR ROLE / あなたの役職</div><div id="my-role-name" class="text-base font-bold text-amber-200 truncate">配役待機中</div><div id="my-role-team" class="text-[10px] text-slate-400">ゲーム開始後に表示</div></div>
+                <button onclick="showMyRole()" class="shrink-0 px-4 py-2 rounded-xl bg-sky-900/70 border border-sky-500/40 text-sky-100 text-xs font-bold">役職・能力を見る</button>
+            </section>
+
+            <!-- PRIVATE REPORTS: 聖なる告発（使用者本人の画面だけに表示） -->
+            <section id="accusation-report-panel" class="hidden glass-panel p-4 rounded-2xl border border-amber-500/50 shadow-lg shadow-amber-950/20 space-y-3" aria-live="polite">
+                <div class="flex items-center justify-between gap-3 border-b border-amber-900/50 pb-2">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-file-shield text-amber-300"></i>
+                        <h3 class="text-sm font-bold text-amber-200">聖なる告発｜秘匿報告</h3>
+                    </div>
+                    <span class="text-[10px] text-amber-400">使用者本人のみ表示</span>
+                </div>
+                <div id="accusation-report-list" class="space-y-3 max-h-[420px] overflow-y-auto pr-1"></div>
+            </section>
+
+            <!-- MAIN BATTLE GRID -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                
+                <!-- PLAYERS BOARD (LEFT 2 COLS) -->
+                <div class="lg:col-span-2 space-y-4">
+                    <div id="players-board" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                        <!-- Populated dynamically -->
+                    </div>
+
+                    <!-- MY HAND CARDS -->
+                    <div class="glass-panel p-4 rounded-2xl border border-slate-800 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <h4 class="text-xs font-bold text-slate-300 flex items-center gap-2">
+                                <i class="fa-solid fa-hand text-amber-500"></i>
+                                <span>あなたの所持カード</span>
+                            </h4>
+                            <span class="text-[10px] text-slate-400">「カード使用フェーズ」で発動可能</span>
+                        </div>
+                        <div id="hand-cards-container" class="grid grid-cols-2 sm:grid-cols-4 gap-2 min-h-[100px]">
+                            <!-- Hand Cards Rendered Here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CHAT & LOGS PANEL (RIGHT COL) -->
+                <div class="glass-panel p-4 rounded-2xl border border-slate-800 flex flex-col h-[520px]">
+                    <h4 class="text-xs font-bold text-slate-300 mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-comments text-sky-400"></i>
+                        <span>審問・議論ログ</span>
+                    </h4>
+                    <div id="chat-logs" class="flex-1 overflow-y-auto space-y-2 p-3 bg-slate-950/80 rounded-xl border border-slate-900 text-xs">
+                        <!-- Logs dynamically inserted -->
+                    </div>
+                    <div class="mt-3 flex gap-2">
+                        <input type="text" id="chat-input" placeholder="主張・弁明を入力..." onkeydown="if(event.key==='Enter') sendChatMessage()" class="flex-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-amber-500">
+                        <button id="chat-send-button" onclick="sendChatMessage()" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl transition-all">
+                            発言
+                        </button>
+                    </div>
+                    <div id="rest-status" class="hidden mt-2 text-[10px] text-amber-300 bg-amber-950/30 border border-amber-900/50 rounded-lg px-3 py-2"></div>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL: ROLE REVEAL -->
+    <div id="modal-role" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+        <div class="glass-panel p-6 rounded-3xl max-w-sm w-full border border-amber-500/40 text-center space-y-4">
+            <span class="text-[10px] tracking-widest text-amber-400 uppercase font-mono">YOUR HIDDEN ROLE</span>
+            <div id="role-icon" class="text-5xl text-amber-400 py-2">
+                <i class="fa-solid fa-user-ninja"></i>
+            </div>
+            <h3 id="role-title" class="text-2xl font-bold font-cinzel text-slate-100">---</h3>
+            <p id="role-desc" class="text-xs text-slate-300 leading-relaxed">役職説明</p>
+            <button onclick="closeRoleModal()" class="w-full py-3 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded-xl text-xs transition-all">
+                確認した
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL: VOTE & ACTION SELECTION -->
+    <div id="modal-vote" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+        <div class="glass-panel p-6 rounded-3xl max-w-sm w-full border border-rose-900/60 text-center space-y-4">
+            <h3 id="vote-modal-title" class="text-xl font-bold font-cinzel text-rose-300">対象の選択</h3>
+            <p id="vote-modal-desc" class="text-xs text-slate-400">対象を1人選択してください</p>
+            <div id="vote-candidates" class="space-y-2 max-h-60 overflow-y-auto">
+                <!-- Buttons rendered dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ASHES PASS (聖なる遺灰) -->
+    <div id="modal-ashes" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+        <div class="glass-panel p-6 rounded-3xl max-w-sm w-full border border-amber-500/80 text-center space-y-4 animate-bounce-short">
+            <i class="fa-solid fa-fire-flame-curved text-amber-400 text-4xl animate-pulse"></i>
+            <h3 class="text-xl font-bold font-cinzel text-amber-300">聖なる遺灰が発動！</h3>
+            <p class="text-xs text-slate-300">あなた（<span id="ashes-role-name" class="font-bold text-amber-400">---</span>）は敗れましたが、生存者1名に自分の役職を【強制継承】できます。</p>
+            <div id="ashes-candidates" class="space-y-2 max-h-60 overflow-y-auto">
+                <!-- Target buttons -->
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: GAME RESULT -->
+    <div id="modal-result" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+        <div class="glass-panel p-8 rounded-3xl max-w-md w-full border border-amber-500/50 text-center space-y-6">
+            <h2 id="result-title" class="text-3xl font-bold font-cinzel text-amber-300">----</h2>
+            <p id="result-subtitle" class="text-xs text-slate-300">----</p>
+            
+            <div class="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 text-left space-y-2">
+                <span class="text-[10px] text-slate-500 font-bold block mb-1">最終役職内訳</span>
+                <div id="result-roles-summary" class="text-xs space-y-1">
+                    <!-- Dynamic summary -->
+                </div>
+            </div>
+
+            <div class="flex gap-4">
+                <button onclick="leaveRoom()" class="w-1/2 py-3 bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold text-xs rounded-xl transition-all">
+                    ルーム退出
+                </button>
+                <button onclick="rematchGame()" class="w-1/2 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow transition-all">
+                    もう一試合（再戦）
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: IN-GAME NOTICE (browser alert replacement) -->
+    <div id="modal-notice" class="hidden fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="notice-title" aria-describedby="notice-message">
+        <div class="glass-panel p-6 rounded-3xl max-w-md w-full border border-sky-500/50 shadow-2xl shadow-sky-950/30 space-y-4 text-center">
+            <div class="mx-auto w-12 h-12 rounded-2xl bg-sky-950/70 border border-sky-500/40 flex items-center justify-center">
+                <i class="fa-solid fa-circle-info text-sky-300 text-xl"></i>
+            </div>
+            <h3 id="notice-title" class="text-lg font-bold text-sky-200">ゲーム通知</h3>
+            <p id="notice-message" class="text-sm text-slate-200 leading-relaxed whitespace-pre-line break-words text-left select-text"></p>
+            <button id="notice-close-button" onclick="closeGameNotice()" class="w-full py-3 bg-sky-700 hover:bg-sky-600 text-white font-bold rounded-xl text-sm transition-all">確認</button>
+        </div>
+    </div>
+
+    <!-- GAME LOGIC SCRIPT -->
+    <script>
+        // 参加人数はホストを含む合計人数。オンライン・一人用共通のゲーム上限。
+        const MIN_PLAYERS = 4;
+        const MAX_PLAYERS = 18;
+
+        const PHASES = {
+            DRAW: 'ドローフェーズ',
+            CARD: 'カード使用フェーズ',
+            DISCUSSION: '口論・審問フェーズ',
+            VOTE: '投票・追放フェーズ',
+            PRE_MEETING: '会議前の暗殺フェーズ',
+            KILL: '襲撃（殺）フェーズ',
+            END: '決着'
+        };
+
+        const ROLES = {
+            CITIZEN: { id: 'CITIZEN', name: '聖導者 (市民)', icon: 'fa-user-shield', team: 'HUMAN', desc: '能力を持たない無実の市民。会話と推理で使徒の追放を目指す。' },
+            SEER: { id: 'SEER', name: 'つかさどる者 (占い)', icon: 'fa-eye', team: 'HUMAN', desc: '夜ごとに生存者1名を占い、人間陣営・人狼陣営・第三陣営のどれかを本人だけに知らせる。' },
+            APOSTLE: { id: 'APOSTLE', name: '人狼', icon: 'fa-skull', team: 'EVIL', desc: '夜の襲撃で生存者1名を殺害する。人狼陣営の基本役職。' },
+            KILLER_BOMB: { id: 'KILLER_BOMB', name: 'キラーボム', icon: 'fa-bomb', team: 'EVIL', desc: '夜に生存者1名へ気づかれない爆弾を仕掛ける。対象は次のターンの夜に爆発して死亡する。' },
+            DEATH_OF_10AM: { id: 'DEATH_OF_10AM', name: 'デスOF10AM', icon: 'fa-hourglass-half', team: 'EVIL', desc: '人狼の夜襲撃能力に加え、会議前に1名を暗殺するか、何もしないか選べる。' },
+            PEOPLE_RUN: { id: 'PEOPLE_RUN', name: 'ピーポーrun', icon: 'fa-person-running', team: 'EVIL', desc: '人狼の夜襲撃能力を持つ。投票フェーズごとに、自分に入った票を1票だけ無効化する。' },
+            BLACK_MAGE: { id: 'BLACK_MAGE', name: '黒魔術師', icon: 'fa-hat-wizard', team: 'EVIL', desc: '人狼陣営。夜に6種類の黒魔術から1つを選んで発動する。' },
+            NINETY_NINE: { id: 'NINETY_NINE', name: 'デスナインティーナイン', icon: 'fa-robot', team: 'NINETY_NINE', desc: '【99カード限定・第三陣営】99カード所持者が死亡すると起動する殺戮兵器。夜ごとに生存者1名を乗っ取り、操り人形の投票先を命令できる。全生存者の支配で単独勝利。' },
+            NINETY_NINE_PUPPET: { id: 'NINETY_NINE_PUPPET', name: 'ナインティーナインの操り人形', icon: 'fa-person-rays', team: 'NINETY_NINE', desc: '意識をナインティーナインに乗っ取られている。自分では発言・投票・カード使用ができない。投票先は操縦者の命令に従う。' }
+        };
+
+        const ACTION_CARDS = [
+            { id: 'CARD_ACCUSE', name: '聖なる告発', rarity: 'common', weight: 50, desc: '対象の正体と行動履歴を自分だけに公開。代償として使用したターンの残りと次のターン（2ターン分）は議論・投票・カード使用を休む。' },
+            { id: 'CARD_SHIELD', name: '身代わりの灰', rarity: 'rare', weight: 30, desc: '今夜の自分への襲撃を完全に無効化する。' },
+            { id: 'CARD_ASHES', name: '聖なる遺灰', rarity: 'epic', weight: 15, desc: '【パッシブ】自分が死亡した際、生存者に自分の役職を強制移転させる。' },
+            { id: 'CARD_REPLAY', name: '時空の残留', rarity: 'legendary', weight: 5, desc: '前回の試合で担当していた自分の役職へ変化・上書きする。' },
+            { id: 'CARD_NINETY_NINE', name: '99カード', rarity: 'mythic', weight: 0, desc: '【超レア・パッシブ】所持者が死亡するとデスナインティーナインとして起動。夜に相手を乗っ取り、操り人形の投票先も命令できる。起動者と被害者は全体には伏せられる。' }
+        ];
+
+        let peer = null;
+        let conn = null;
+        let isHost = false;
+        let isTestMode = false;
+        let myPeerId = '';
+        let activeRoomId = '';
+        let activePlayerName = '';
+        let pendingJoinTimeout = null;
+        let mobileModeManualOverride = false;
+        // PeerJSの内部connections構造に依存せず、プレイヤーID単位で接続を明示管理する
+        let hostConnections = new Map();
+        let syncSequence = 0;
+        let lastAppliedSyncSequence = 0;
+        // 報告を閉じた状態は画面ローカルだけで管理し、他プレイヤーへ同期しない。
+        let dismissedAccusationReports = new Set();
+
+        let gameState = {
+            roomId: '',
+            phase: PHASES.DRAW,
+            roundNumber: 0,
+            myId: '',
+            players: [], // { id, name, role, isAlive, hand: [], isHost, isAi, isProtected }
+            timer: 0,
+            timerInterval: null,
+            votes: {},
+            killResolved: false,
+            preMeetingActionRound: 0,
+            ninetyNineCardDrawn: false,
+            ninetyNineOwnerId: null,
+            ninetyNineResolvedRound: 0,
+            ninetyNineCommandRound: 0,
+            lastHistoryRole: {},
+            resultTitle: '',
+            resultSubtitle: '',
+            wolfCountSetting: 2
+        };
+
+        // --- LOBBY & SETUP ---
+        function createRoom() {
+            if (conn) { try { conn.close(); } catch (_) {} conn = null; }
+            if (peer && !peer.destroyed) { try { peer.destroy(); } catch (_) {} }
+            peer = null;
+            const nameInput = document.getElementById('input-player-name').value.trim() || 'ホスト';
+            myPeerId = 'ECHO-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+            isHost = true;
+            isTestMode = false;
+            hostConnections.clear();
+            syncSequence = 0;
+            lastAppliedSyncSequence = 0;
+            activeRoomId = '';
+            activePlayerName = nameInput;
+            gameState.roomId = myPeerId;
+            gameState.myId = myPeerId;
+
+            initPeer(myPeerId, (openedId) => {
+                myPeerId = openedId;
+                gameState.roomId = openedId;
+                gameState.myId = openedId;
+                activeRoomId = openedId;
+                updateAddressRoomParameter(openedId);
+                gameState.players = [{
+                    id: openedId,
+                    name: nameInput,
+                    role: null,
+                    isAlive: true,
+                    hand: [],
+                    isHost: true,
+                    isAi: false,
+                    isProtected: false,
+                    actionHistory: [],
+                    restUntilRound: 0,
+                    privateReports: [],
+                    isConnected: true
+                }];
+                switchScreen('screen-waiting');
+                document.getElementById('display-room-id').innerText = openedId;
+                document.getElementById('room-status-badge').classList.remove('hidden');
+                document.getElementById('room-invite-copy-button')?.classList.remove('hidden');
+                setNetworkStatus('ホスト接続中', true);
+                renderWaitingRoomMembers();
+            });
+        }
+
+        function joinRoom() {
+            const nameInput = document.getElementById('input-player-name').value.trim() || '参列者';
+            const roomId = document.getElementById('input-room-id').value.trim().toUpperCase();
+            if (!roomId) { gameNotice('ルームIDを入力してください'); return; }
+
+            if (conn) { try { conn.close(); } catch (_) {} conn = null; }
+            if (peer && !peer.destroyed) { try { peer.destroy(); } catch (_) {} }
+            peer = null;
+            if (pendingJoinTimeout) { clearTimeout(pendingJoinTimeout); pendingJoinTimeout = null; }
+
+            myPeerId = 'CLIENT-' + Math.random().toString(36).substring(2, 9).toUpperCase();
+            isHost = false;
+            isTestMode = false;
+            lastAppliedSyncSequence = 0;
+            activeRoomId = roomId;
+            activePlayerName = nameInput;
+            gameState.myId = myPeerId;
+            setNetworkStatus('接続中…', false);
+
+            pendingJoinTimeout = setTimeout(() => {
+                if (!conn || !conn.open) {
+                    setNetworkStatus('接続失敗', false);
+                    gameNotice('ホストに接続できませんでした。ルームID・ホストの起動状態・インターネット接続を確認してください。');
+                    try { if (conn) conn.close(); } catch (_) {}
+                    try { if (peer && !peer.destroyed) peer.destroy(); } catch (_) {}
+                    conn = null;
+                    peer = null;
+                }
+                pendingJoinTimeout = null;
+            }, 20000);
+
+            initPeer(myPeerId, (openedId) => {
+                myPeerId = openedId;
+                gameState.myId = openedId;
+                try {
+                    const clientConnection = peer.connect(roomId, { reliable: true });
+                    if (!clientConnection) throw new Error('接続オブジェクトを作成できませんでした');
+                    conn = clientConnection;
+
+                    clientConnection.on('data', handleClientData);
+                    clientConnection.on('open', () => {
+                        if (conn !== clientConnection || !clientConnection.open) return;
+                        if (pendingJoinTimeout) { clearTimeout(pendingJoinTimeout); pendingJoinTimeout = null; }
+                        clientConnection.send({ type: 'JOIN', id: openedId, name: nameInput });
+                        updateAddressRoomParameter(roomId);
+                        switchScreen('screen-waiting');
+                        document.getElementById('display-room-id').innerText = roomId;
+                        document.getElementById('room-status-badge').classList.remove('hidden');
+                        document.getElementById('room-invite-copy-button')?.classList.remove('hidden');
+                        setNetworkStatus('ホスト応答待ち', false);
+                        addLog('SYSTEM', 'ホストに接続しました。参加情報を受信しています…');
+                    });
+                    clientConnection.on('close', () => {
+                        if (conn !== clientConnection) return;
+                        if (pendingJoinTimeout) { clearTimeout(pendingJoinTimeout); pendingJoinTimeout = null; }
+                        setNetworkStatus('切断', false);
+                        gameNotice('ホストとの接続が切れました。このゲームでは再接続できません。部屋が開いている場合は、ロビーから新しい参加者として入り直してください。');
+                    });
+                    clientConnection.on('error', (err) => {
+                        if (conn !== clientConnection) return;
+                        console.error('[ECHO client connection]', err);
+                        if (pendingJoinTimeout) { clearTimeout(pendingJoinTimeout); pendingJoinTimeout = null; }
+                        setNetworkStatus('接続エラー', false);
+                        gameNotice('ホストへ接続できませんでした。ルームIDとホストの接続状態を確認してください。');
+                    });
+                } catch (e) {
+                    console.error('[ECHO join]', e);
+                    if (pendingJoinTimeout) { clearTimeout(pendingJoinTimeout); pendingJoinTimeout = null; }
+                    setNetworkStatus('接続エラー', false);
+                    gameNotice('オンライン接続を開始できませんでした。ネット接続とPeerJSサーバーへのアクセスを確認してください。');
+                }
+            });
+        }
+
+        function updateAddressRoomParameter(roomId) {
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set('room', String(roomId).toUpperCase());
+                history.replaceState(null, '', url.toString());
+            } catch (_) {}
+        }
+        function getRoomInviteUrl(roomId) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('room', String(roomId || '').toUpperCase());
+            return url.toString();
+        }
+        async function copyRoomInviteLink() {
+            const roomId = String(gameState.roomId || activeRoomId || document.getElementById('display-room-id')?.innerText || '').trim().toUpperCase();
+            if (isTestMode || !roomId || roomId === '------' || roomId === 'TEST-LOCAL' || roomId === 'TEST_ROOM') {
+                gameNotice('共有できるオンラインルームがありません。先にオンライン部屋を作成してください。');
+                return;
+            }
+            const inviteUrl = getRoomInviteUrl(roomId);
+            let copied = false;
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(inviteUrl);
+                    copied = true;
+                }
+            } catch (_) {}
+            if (!copied) {
+                const box = document.createElement('textarea');
+                box.value = inviteUrl;
+                box.setAttribute('readonly', '');
+                box.style.position = 'fixed';
+                box.style.opacity = '0';
+                document.body.appendChild(box);
+                box.select();
+                try { copied = document.execCommand('copy'); } catch (_) {}
+                box.remove();
+            }
+            gameNotice(copied ? `招待リンクをコピーしました。友達に送ってください。\n${inviteUrl}` : `このリンクをコピーして共有してください。\n${inviteUrl}`, 'ルーム招待');
+        }
+        function setNetworkStatus(label, connected) {
+            const el = document.getElementById('network-status-indicator');
+            if (!el) return;
+            el.textContent = label;
+            el.classList.toggle('text-emerald-300', !!connected);
+            el.classList.toggle('text-rose-300', !connected);
+            el.classList.toggle('text-amber-300', label.includes('待ち') || label.includes('中…'));
+        }
+
+        function initializeMobileMode() {
+            const query = window.matchMedia('(max-width: 768px) or ((pointer: coarse) and (max-width: 1024px))');
+            const apply = () => {
+                if (!mobileModeManualOverride) document.body.classList.toggle('force-mobile', query.matches);
+                const enabled = document.body.classList.contains('force-mobile');
+                const button = document.getElementById('mobile-mode-toggle');
+                if (button) button.innerText = enabled ? 'スマホモード ON' : 'スマホモード OFF';
+            };
+            apply();
+            if (query.addEventListener) query.addEventListener('change', apply);
+            else if (query.addListener) query.addListener(apply);
+        }
+
+        function initializeRoomEntry() {
+            initializeMobileMode();
+            const params = new URLSearchParams(window.location.search);
+            const inviteRoom = String(params.get('room') || '').trim().toUpperCase();
+            if (inviteRoom) {
+                document.getElementById('input-room-id').value = inviteRoom;
+                const hint = document.getElementById('invite-link-hint');
+                if (hint) hint.classList.remove('hidden');
+            }
+        }
+
+        function startTestMode() {
+            isTestMode = true;
+            isHost = true;
+            peer = null;
+            conn = null;
+            hostConnections.clear();
+            syncSequence = 0;
+            myPeerId = 'LOCAL_HOST';
+            gameState.roomId = 'TEST_ROOM';
+            gameState.myId = myPeerId;
+
+            const nameInput = document.getElementById('input-player-name').value.trim() || 'あなた';
+
+            const aiNames = ['ヴァルター', 'エレナ', 'マルセル', 'ノア', 'リゼット', 'オスカー', 'ミレイユ', 'ハインリヒ', 'シエラ', 'カイン', 'セレス', 'ルカ', 'イザベル', 'ディートリヒ', 'フィオナ', 'レオン', 'アデル'];
+            gameState.players = [
+                { id: myPeerId, name: nameInput, role: null, isAlive: true, hand: [], isHost: true, isAi: false, isProtected: false, actionHistory: [], restUntilRound: 0, privateReports: [] },
+                ...aiNames.map((name, i) => ({
+                    id: `NPC_${i + 1}`, name: `${name} (AI)`, role: null,
+                    isAlive: true, hand: [], isHost: false, isAi: true, isProtected: false, actionHistory: [], restUntilRound: 0, privateReports: []
+                }))
+            ];
+
+            switchScreen('screen-waiting');
+            document.getElementById('display-room-id').innerText = 'TEST-LOCAL';
+            document.getElementById('room-status-badge').classList.remove('hidden');
+            document.getElementById('room-invite-copy-button')?.classList.add('hidden');
+            setNetworkStatus('一人用AI', true);
+            renderWaitingRoomMembers();
+        }
+
+        function initPeer(id, callback) {
+            if (typeof Peer === 'undefined') {
+                if (pendingJoinTimeout) { clearTimeout(pendingJoinTimeout); pendingJoinTimeout = null; }
+                setNetworkStatus('PeerJS未読込', false);
+                gameNotice('PeerJSを読み込めませんでした。インターネット接続またはCDNへのアクセスを確認してください。');
+                return;
+            }
+            try {
+                peer = new Peer(id, { debug: 1 });
+                let opened = false;
+                peer.on('open', (openedId) => {
+                    const firstOpen = !opened;
+                    opened = true;
+                    console.info('[ECHO PeerJS open]', openedId);
+                    // Peer IDが開いた最初の一度だけ初期化する。
+                    if (firstOpen && callback) callback(openedId || id);
+                });
+                peer.on('connection', (c) => {
+                    if (!isHost) { c.close(); return; }
+                    c.on('open', () => console.info('[ECHO incoming connection]', c.peer));
+                    c.on('data', (d) => handleHostData(c, d));
+                    c.on('close', () => {
+                        const playerId = c._echoPlayerId;
+                        // 切断されたプレイヤー接続だけを処理する。
+                        if (!playerId || hostConnections.get(playerId) !== c) return;
+                        hostConnections.delete(playerId);
+                        const playerIndex = gameState.players.findIndex(p => p.id === playerId);
+                        const player = playerIndex >= 0 ? gameState.players[playerIndex] : null;
+                        if (player) {
+                            if (gameState.roundNumber === 0) {
+                                gameState.players.splice(playerIndex, 1);
+                            } else {
+                                player.isConnected = false;
+                                if (player.isAlive) {
+                                    player.isAlive = false;
+                                    addLog('SYSTEM', `${player.name} の接続が切れたため、対戦から離脱しました。`);
+                                }
+                            }
+                            renderWaitingRoomMembers();
+                            broadcastGameState();
+                        }
+                    });
+                    c.on('error', (err) => {
+                        console.error('[ECHO incoming data connection]', err);
+                        try { c.close(); } catch (_) {}
+                    });
+                });
+                peer.on('disconnected', () => {
+                    console.warn('[ECHO PeerJS disconnected]');
+                    setNetworkStatus('通信サーバー切断', false);
+                    gameNotice('PeerJSの通信サーバーとの接続が切れました。オンライン対戦を続けられない場合は、ページを再読み込みして新しい部屋に入り直してください。');
+                });
+                peer.on('error', (err) => {
+                    console.error('[ECHO PeerJS error]', err);
+                    if (!opened) {
+                        if (pendingJoinTimeout) { clearTimeout(pendingJoinTimeout); pendingJoinTimeout = null; }
+                        const reason = err && (err.type || err.message) ? (err.type || err.message) : '不明なエラー';
+                        setNetworkStatus('接続エラー', false);
+                        const detail = err && err.type === 'unavailable-id' ? 'このルームIDはすでに使用中です。少し待ってから新しい部屋を作成してください。' : `PeerJSの接続に失敗しました（${reason}）。ネット接続・CDNへのアクセスを確認してください。`;
+                        gameNotice(detail);
+                    }
+                });
+            } catch (e) {
+                console.error('[ECHO PeerJS init]', e);
+                setNetworkStatus('初期化失敗', false);
+                gameNotice('PeerJSを初期化できませんでした。ネット接続とPeerJS CDNへのアクセスを確認してください。');
+            }
+        }
+
+        function switchScreen(screenId) {
+            ['screen-lobby', 'screen-waiting', 'screen-game'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        // 聖なる告発の代償：使用直後から、このターンの残り＋次の1ターンを休む（計2ターン分）。
+        function isPlayerResting(player) {
+            if (!player || !player.isAlive) return false;
+            const endRound = Number(player.restUntilRound || 0);
+            const startRound = Number(player.restFromRound || (endRound ? endRound - 1 : 0));
+            const currentRound = Number(gameState.roundNumber || 0);
+            return endRound > 0 && currentRound >= startRound && currentRound <= endRound;
+        }
+
+        function isNinetyNinePuppet(player) {
+            return !!player && player.role?.id === 'NINETY_NINE_PUPPET';
+        }
+
+        const STANDARD_WOLF_ROLE_IDS = ['APOSTLE', 'DEATH_OF_10AM', 'PEOPLE_RUN'];
+        function isStandardWolf(player) {
+            return !!player && STANDARD_WOLF_ROLE_IDS.includes(player.role?.id);
+        }
+        function isWolfFaction(player) {
+            return !!player && player.role?.team === 'EVIL';
+        }
+        // 役職名を伏せたオンライン画面でも、人狼陣営だけは仲間を対象候補から除外できる。
+        function isWolfAllyForMe(player) {
+            return isWolfFaction(player) || player?.isWolfAlly === true;
+        }
+
+        function isNinetyNineController(player) {
+            return !!player && player.isAlive && player.role?.id === 'NINETY_NINE';
+        }
+
+        function getActiveNinetyNineController() {
+            const byId = gameState.players.find(p => p.id === gameState.ninetyNineOwnerId && isNinetyNineController(p));
+            return byId || gameState.players.find(isNinetyNineController) || null;
+        }
+
+        function getEligibleVoters() {
+            return gameState.players.filter(p => p.isAlive && !isPlayerResting(p) && !isNinetyNinePuppet(p) && !isNinetyNineController(p));
+        }
+
+        // 99の操縦者が倒れたら、まだ生存している操り人形を元の役職へ戻す。
+        function releaseNinetyNinePuppets(ownerId) {
+            gameState.players.forEach(p => {
+                if (p.controlledBy99 === ownerId || p.role?.id === 'NINETY_NINE_PUPPET') {
+                    if (p.ninetyNineOriginalRole) p.role = { ...p.ninetyNineOriginalRole };
+                    delete p.controlledBy99;
+                    delete p.ninetyNineOriginalRole;
+                }
+            });
+            if (gameState.ninetyNineOwnerId === ownerId) gameState.ninetyNineOwnerId = null;
+            addLog('SYSTEM', 'ナインティーナインの操縦信号が途絶え、奪われていた意識が解放された……');
+        }
+
+        // 99カード所持者かどうかは公開ログの匿名化にも使う。
+        function hasNinetyNineCard(player) {
+            return !!player && Array.isArray(player.hand) && player.hand.some(c => c && c.id === 'CARD_NINETY_NINE');
+        }
+
+        // 99カード所持者は死亡時に復活し、独立した殺戮兵器へ変化する。
+        // 起動の引き金になった人物名は公開ログ・他人の行動履歴に残さない。
+        function awakenNinetyNine(deadPlayer) {
+            if (!hasNinetyNineCard(deadPlayer)) return false;
+            const active = getActiveNinetyNineController();
+            if (active && active.id !== deadPlayer.id) return false;
+
+            deadPlayer.isAlive = true;
+            deadPlayer.role = { ...ROLES.NINETY_NINE };
+            deadPlayer.hand = [];
+            deadPlayer.isProtected = false;
+            deadPlayer.restUntilRound = 0;
+            deadPlayer.restFromRound = 0;
+            deadPlayer.controlledBy99 = null;
+            gameState.ninetyNineOwnerId = deadPlayer.id;
+            gameState.ninetyNineResolvedRound = 0;
+            addLog('SYSTEM', '誰かの死を引き金に、デスナインティーナインが起動した……起動者の正体は不明。');
+            if (deadPlayer.id === gameState.myId) {
+                gameNotice('【99カード起動】あなたはデスナインティーナインとして蘇った。夜に生存者を乗っ取り、全員を支配すれば単独勝利です。');
+            }
+            broadcastGameState();
+            return true;
+        }
+
+        // --- NETWORK COMMUNICATIONS ---
+        function sendToAllClients(message) {
+            if (!isHost || isTestMode) return;
+            for (const [peerId, c] of hostConnections.entries()) {
+                if (!c || !c.open || !c._echoJoined) continue;
+                try { c.send(message); }
+                catch (e) { console.warn('[ECHO send failed]', peerId, e); }
+            }
+        }
+
+        function handleHostData(connection, data) {
+            if (!data || typeof data !== 'object' || typeof data.type !== 'string') return;
+            if (connection && (!connection.open || connection.peer == null)) return;
+
+            if (data.type === 'JOIN') {
+                if (!connection) return;
+                const actualId = connection.peer;
+                if (data.id !== actualId || connection._echoJoined) {
+                    connection.send({ type: 'NOTICE', message: '参加情報を確認できませんでした。ロビーからもう一度参加してください。' });
+                    return;
+                }
+                if (gameState.players.some(p => p.id === actualId)) {
+                    connection.send({ type: 'NOTICE', message: 'この接続IDはすでに参加しています。ページを再読み込みしてください。' });
+                    return;
+                }
+                if (gameState.players.length < MAX_PLAYERS && gameState.phase === PHASES.DRAW && gameState.roundNumber === 0) {
+                    const player = {
+                        id: actualId,
+                        name: String(data.name || '参列者').trim().slice(0, 12) || '参列者',
+                        role: null,
+                        isAlive: true,
+                        hand: [],
+                        isHost: false,
+                        isAi: false,
+                        isProtected: false,
+                        actionHistory: [],
+                        restUntilRound: 0,
+                        privateReports: [],
+                        isConnected: true
+                    };
+                    connection._echoPlayerId = player.id;
+                    connection._echoJoined = true;
+                    hostConnections.set(player.id, connection);
+                    gameState.players.push(player);
+                    try { connection.send({ type: 'JOIN_ACCEPTED', playerId: player.id }); } catch (_) {}
+                    broadcastGameState();
+                    renderWaitingRoomMembers();
+                } else if (connection) {
+                    const message = gameState.roundNumber > 0 || gameState.phase !== PHASES.DRAW
+                        ? 'この対戦はすでに始まっています。途中参加はできません。'
+                        : 'この部屋は満員です（最大18人・ホストを含む）。';
+                    connection.send({ type: 'NOTICE', message });
+                }
+            } else if (data.type === 'LEAVE') {
+                if (!connection || !connection._echoJoined) return;
+                const playerId = connection._echoPlayerId;
+                if (hostConnections.get(playerId) !== connection) return;
+                const player = gameState.players.find(p => p.id === playerId);
+                hostConnections.delete(playerId);
+                if (player) {
+                    player.isConnected = false;
+                    if (gameState.roundNumber === 0) gameState.players = gameState.players.filter(p => p.id !== playerId);
+                    else if (player.isAlive) {
+                        player.isAlive = false;
+                        addLog('SYSTEM', `${player.name} がルームを退出しました。`);
+                    }
+                }
+                connection._echoJoined = false;
+                renderWaitingRoomMembers();
+                broadcastGameState();
+            } else if (connection && (!connection._echoJoined || hostConnections.get(connection._echoPlayerId) !== connection)) {
+                // 現在の参加接続以外から届いた操作は受け付けない。
+                return;
+            } else if (data.type === 'ACTION_VOTE') {
+                if (connection && (!connection._echoJoined || connection._echoPlayerId !== data.voterId)) return;
+                registerVote(data.voterId, data.targetId);
+            } else if (data.type === 'ACTION_KILL') {
+                if (connection && (!connection._echoJoined || connection._echoPlayerId !== data.killerId)) return;
+                processKillAction(data.targetId, data.killerId);
+            } else if (data.type === 'ACTION_SEER') {
+                if (connection && (!connection._echoJoined || connection._echoPlayerId !== data.playerId)) return;
+                processSeerAction(data.playerId, data.targetId);
+            } else if (data.type === 'ACTION_BLACK_MAGIC') {
+                if (connection && (!connection._echoJoined || connection._echoPlayerId !== data.playerId)) return;
+                processBlackMagicAction(data.playerId, data.spellId, data.targetId, data.target2Id);
+            } else if (data.type === 'ACTION_KILLER_BOMB') {
+                if (connection && (!connection._echoJoined || connection._echoPlayerId !== data.playerId)) return;
+                processKillerBombAction(data.playerId, data.targetId);
+            } else if (data.type === 'ACTION_DEATH10') {
+                if (connection && (!connection._echoJoined || connection._echoPlayerId !== data.playerId)) return;
+                processDeath10Action(data.playerId, data.targetId || null);
+            } else if (data.type === 'ACTION_NINETY_NINE') {
+                if (connection && (!connection._echoJoined || connection._echoPlayerId !== data.controllerId)) return;
+                processNinetyNineAttack(data.controllerId, data.targetId);
+            } else if (data.type === 'ACTION_99_COMMAND') {
+                if (connection && (!connection._echoJoined || connection._echoPlayerId !== data.controllerId)) return;
+                registerNinetyNineCommand(data.controllerId, data.targetId);
+            } else if (data.type === 'ACTION_CARD') {
+                if (connection && (!connection._echoJoined || connection._echoPlayerId !== data.playerId)) return;
+                processCardUse(data.playerId, data.card, data.targetId);
+            } else if (data.type === 'ACTION_ASHES') {
+                if (connection && (!connection._echoJoined || connection._echoPlayerId !== data.deadId)) return;
+                processAshesPass(data.deadId, data.targetId);
+            } else if (data.type === 'CHAT') {
+                const sender = connection ? gameState.players.find(p => p.id === connection._echoPlayerId) : gameState.players.find(p => p.id === gameState.myId);
+                if (connection && (!connection._echoJoined || !sender || !sender.isAlive)) return;
+                if (sender && (isNinetyNinePuppet(sender) || isNinetyNineController(sender))) return;
+                // 聖なる告発の代償中はフェーズを問わずチャット送信を禁止。
+                // クライアント側のボタン無効化だけに頼らず、ホスト側でも必ず拒否する。
+                if (sender && isPlayerResting(sender)) return;
+                if (connection && gameState.phase === PHASES.DISCUSSION && Number(sender?.silencedUntilRound || 0) >= Number(gameState.roundNumber || 0)) return;
+                const text = String(data.text || '').trim().slice(0, 300);
+                if (text) broadcastMessage(sender ? sender.name : 'ホスト', text);
+            }
+        }
+
+        function handleClientData(data) {
+            if (!data || typeof data !== 'object') return;
+            if (data.type === 'SYNC_STATE') {
+                const incomingSeq = Number(data.seq || 0);
+                if (incomingSeq && incomingSeq <= lastAppliedSyncSequence) return;
+                if (incomingSeq) lastAppliedSyncSequence = incomingSeq;
+
+                const preservedMyId = myPeerId || gameState.myId;
+                const previousPhase = gameState.phase;
+                const previousRound = gameState.roundNumber || 0;
+                const previousMe = gameState.players.find(p => p.id === preservedMyId);
+                const wasAlive = previousMe ? previousMe.isAlive : true;
+                const oldRoleId = previousMe?.role?.id || null;
+                gameState = data.state;
+                gameState.myId = preservedMyId;
+                updateGameUI();
+
+                const me = gameState.players.find(p => p.id === preservedMyId);
+                if (previousPhase !== PHASES.END && previousRound > 0 && wasAlive && me?.isAlive && me.role?.id && (!oldRoleId || oldRoleId !== me.role.id)) {
+                    if (me.role.id === 'NINETY_NINE') {
+                        document.getElementById('modal-vote').classList.add('hidden');
+                        currentModalCallbackType = null;
+                        currentPendingCard = null;
+                        gameNotice('【99カード起動】あなたはデスナインティーナインとして蘇った。夜に生存者を乗っ取り、操り人形の投票を命令し、全員を支配すれば単独勝利です。');
+                    } else if (me.role.id === 'NINETY_NINE_PUPPET') {
+                        document.getElementById('modal-vote').classList.add('hidden');
+                        currentModalCallbackType = null;
+                        currentPendingCard = null;
+                        gameNotice('【意識乗っ取り】あなたはデスナインティーナインに操られています。あなたが誰に乗っ取られたかは他の参加者には表示されません。自分では発言・投票・カード使用ができず、投票先は操縦者が決めます。');
+                    } else if (oldRoleId === 'NINETY_NINE_PUPPET') {
+                        gameNotice('【操縦解除】ナインティーナインが倒され、あなたは元の役職に戻りました。');
+                    } else {
+                        gameNotice(`【役職変化】あなたの役職が変化しました。\n現在の役職：${me.role.name}`);
+                    }
+                }
+                if ((gameState.roundNumber || 0) > 0) switchScreen('screen-game');
+                else renderWaitingRoomMembers();
+                if ((previousRound === 0 || previousPhase === PHASES.END) && (gameState.roundNumber || 0) > 0 && me && me.role) {
+                    if (previousPhase === PHASES.END) document.getElementById('modal-result').classList.add('hidden');
+                    document.getElementById('role-title').innerText = me.role.name;
+                    document.getElementById('role-desc').innerText = me.role.desc;
+                    document.getElementById('role-icon').innerHTML = `<i class=\"fa-solid ${me.role.icon || 'fa-user'}\"></i>`;
+                    document.getElementById('modal-role').classList.remove('hidden');
+                }
+
+                if (previousPhase !== gameState.phase) {
+                    document.getElementById('modal-vote').classList.add('hidden');
+                    if (me && me.isAlive && gameState.phase === PHASES.VOTE && !isPlayerResting(me) && !isNinetyNinePuppet(me) && !isNinetyNineController(me)) {
+                        const candidates = gameState.players.filter(p => p.isAlive && p.id !== me.id);
+                        if (candidates.length) openVoteModal('追放の選定', '最も不審な対象へ投票してください', candidates, 'VOTE');
+                    } else if (me && me.isAlive && gameState.phase === PHASES.VOTE && isNinetyNineController(me)) {
+                        const puppets = gameState.players.filter(p => p.isAlive && p.controlledBy99 === me.id);
+                        const candidates = gameState.players.filter(p => p.isAlive && p.id !== me.id && p.controlledBy99 !== me.id);
+                        if (puppets.length && candidates.length) openVoteModal('ナインティーナイン：操り人形への命令', `配下${puppets.length}人の投票先を指定してください。`, candidates, 'NINETY_NINE_VOTE');
+                    } else if (me && me.isAlive && gameState.phase === PHASES.PRE_MEETING && me.role?.id === 'DEATH_OF_10AM' && me.death10UsedRound !== gameState.roundNumber) {
+                        const candidates = gameState.players.filter(p => p.isAlive && p.id !== me.id && !isWolfAllyForMe(p));
+                        openVoteModal('デスOF10AM：会議前の暗殺', '会議が始まる前に1人を暗殺するか、今回は何もしないか選んでください。', candidates, 'DEATH10');
+                    } else if (me && me.isAlive && gameState.phase === PHASES.KILL && me.role?.id === 'BLACK_MAGE' && me.blackMagicUsedRound !== gameState.roundNumber) {
+                        openBlackMagicSpellModal();
+                    } else if (me && me.isAlive && gameState.phase === PHASES.KILL && me.role?.id === 'SEER' && me.seerLastRound !== gameState.roundNumber) {
+                        const candidates = gameState.players.filter(p => p.isAlive && p.id !== me.id);
+                        if (candidates.length) openVoteModal('つかさどる者：夜の占い', '占う相手を1人選んでください。結果はあなただけに届きます。', candidates, 'SEER');
+                    } else if (me && me.isAlive && gameState.phase === PHASES.KILL && isStandardWolf(me)) {
+                        const candidates = gameState.players.filter(p => p.isAlive && p.id !== me.id && !isWolfAllyForMe(p));
+                        if (candidates.length) openVoteModal('夜の襲撃', '殺害する相手を1名選んでください', candidates, 'KILL');
+                    } else if (me && me.isAlive && gameState.phase === PHASES.KILL && me.role?.id === 'KILLER_BOMB' && me.bombUsedRound !== gameState.roundNumber) {
+                        const candidates = gameState.players.filter(p => p.isAlive && p.id !== me.id && !isWolfAllyForMe(p));
+                        if (candidates.length) openVoteModal('キラーボム：爆弾の設置', '対象は爆弾に気づきません。次のターンの夜に爆発します。', candidates, 'KILLER_BOMB');
+                    } else if (me && me.isAlive && gameState.phase === PHASES.KILL && me.role?.id === 'NINETY_NINE') {
+                        const candidates = gameState.players.filter(p => p.isAlive && p.id !== me.id && !isNinetyNinePuppet(p));
+                        if (candidates.length) openVoteModal('デスナインティーナイン：意識の捕獲', '操り人形にする相手を1人選んでください。対象者以外には誰が捕獲されたか分かりません。', candidates, 'NINETY_NINE');
+                    }
+                }
+
+                if (wasAlive && me && !me.isAlive && me.hand?.some(c => c.id === 'CARD_ASHES')) {
+                    const candidates = gameState.players.filter(p => p.isAlive && p.id !== me.id);
+                    if (candidates.length) openAshesModal(me, candidates);
+                }
+
+                if (gameState.phase === PHASES.END) renderSyncedGameResult();
+            } else if (data.type === 'PRIVATE_SEER_RESULT') {
+                gameNotice(`【つかさどる者・占い結果】
+第${data.round}ターン
+対象：${data.targetName}
+判定：${data.result}`);
+            } else if (data.type === 'PRIVATE_ABILITY_NOTICE') {
+                gameNotice(data.message || '特殊能力が発動しました。');
+            } else if (data.type === 'JOIN_ACCEPTED') {
+                if (data.playerId) {
+                    myPeerId = data.playerId;
+                    gameState.myId = data.playerId;
+                }
+                setNetworkStatus('オンライン', true);
+                addLog('SYSTEM', 'ホストに参加しました。参加者一覧を同期しています…', true);
+            } else if (data.type === 'NOTICE') {
+                setNetworkStatus('参加拒否', false);
+                gameNotice(data.message || '部屋に参加できませんでした。');
+            } else if (data.type === 'CHAT' || data.type === 'LOG') {
+                addLog(data.sender || 'SYSTEM', data.text || '', true);
+            } else if (data.type === 'TIMER') {
+                const sec = document.getElementById('timer-sec');
+                if (sec) sec.innerText = Math.max(0, Number(data.seconds) || 0);
+            } else if (data.type === 'VFX') {
+                triggerVFX(data.vfxType, true);
+            }
+        }
+
+        function broadcastGameState() {
+            if (isTestMode) { updateGameUI(); return; }
+            if (peer && isHost) {
+                const seq = ++syncSequence;
+                for (const [peerId, c] of hostConnections.entries()) {
+                    if (!c || !c.open || !c._echoJoined) continue;
+                    const view = JSON.parse(JSON.stringify(gameState));
+                    const viewerId = peerId;
+                    view.myId = viewerId;
+                    // 前試合の役職履歴も本人分だけに制限
+                    view.lastHistoryRole = viewerId in (gameState.lastHistoryRole || {})
+                        ? { [viewerId]: gameState.lastHistoryRole[viewerId] }
+                        : {};
+                    const revealAll = gameState.phase === PHASES.END;
+                    const isNinetyNineOwnerView = gameState.ninetyNineOwnerId === viewerId;
+                    const viewerIsWolf = gameState.players.find(p => p.id === viewerId)?.role?.team === 'EVIL';
+                    view.ninetyNineOwnerId = isNinetyNineOwnerView ? viewerId : null;
+                    // カード所持有無や操縦者IDは、本人・操縦者以外へ送らない。
+                    if (!isNinetyNineOwnerView) view.ninetyNineCardDrawn = false;
+                    view.players.forEach(p => {
+                        if (viewerIsWolf) p.isWolfAlly = p.role?.team === 'EVIL';
+                        else delete p.isWolfAlly;
+                        // 行動履歴はホスト側だけに保持し、告発結果だけ本人へ個別送信
+                        p.actionHistory = [];
+                        p.privateReports = p.id === viewerId ? (p.privateReports || []) : [];
+                        if (!isNinetyNineOwnerView) {
+                            delete p.controlledBy99;
+                            delete p.ninetyNineOriginalRole;
+                        }
+                        // 爆弾の設置先・爆発予定はホスト以外に送らない。
+                        delete p.bombExplodeRound;
+                        delete p.bombedBy;
+                        delete p.curseExplodeRound;
+                        if (p.id !== viewerId) {
+                            delete p.silencedUntilRound;
+                            delete p.sealedUntilRound;
+                            delete p.blackMagicUsedRound;
+                            delete p.bombUsedRound;
+                            delete p.seerLastRound;
+                            delete p.seerIntel;
+                            delete p.death10UsedRound;
+                            delete p.peopleRunUsedRound;
+                            p.hand = p.isAlive ? Array(p.hand.length).fill({ name: '伏せ札' }) : [];
+                            if (!revealAll) p.role = null;
+                        }
+                    });
+                    view.votes = {}; // 投票途中の票は非公開
+                    try { c.send({ type: 'SYNC_STATE', seq, state: view }); }
+                    catch (e) { console.warn('[ECHO state sync failed]', peerId, e); }
+                }
+            }
+            updateGameUI();
+        }
+
+        function broadcastMessage(sender, text) {
+            addLog(sender, text, true);
+            sendToAllClients({ type: 'CHAT', sender: sender, text: text });
+        }
+
+        function renderSyncedGameResult() {
+            document.getElementById('result-title').innerText = gameState.resultTitle || 'ゲーム終了';
+            document.getElementById('result-subtitle').innerText = gameState.resultSubtitle || '勝敗が決定しました。';
+            const summaryContainer = document.getElementById('result-roles-summary');
+            if (summaryContainer) {
+                summaryContainer.innerHTML = gameState.players.map(p => `
+                    <div class="flex justify-between items-center py-1 border-b border-slate-900 last:border-0">
+                        <span class="font-bold text-slate-200">${escapeHtml(p.name)}</span>
+                        <span class="font-mono ${p.role?.team === 'EVIL' ? 'text-rose-400' : 'text-amber-300'}">${escapeHtml(p.role?.name || '役職不明')} (${p.isAlive ? '生存' : '死亡'})</span>
+                    </div>
+                `).join('');
+            }
+            document.getElementById('modal-result').classList.remove('hidden');
+        }
+
+        function addLog(sender, text, fromNetwork = false) {
+            const logsContainer = document.getElementById('chat-logs');
+            if (!logsContainer || !text) return;
+
+            const logEntry = document.createElement('div');
+            if (sender === 'SYSTEM') {
+                logEntry.className = 'bg-rose-950/40 border border-rose-900/60 p-2 rounded-xl text-xs text-rose-200 font-mono';
+                logEntry.innerHTML = `<span class="font-bold text-amber-400 mr-2">[システム]</span>${escapeHtml(text)}`;
+            } else if (sender === 'CARD') {
+                logEntry.className = 'bg-amber-950/40 border border-amber-800/60 p-2 rounded-xl text-xs text-amber-200 font-mono';
+                logEntry.innerHTML = `<span class="font-bold text-amber-400 mr-2">[効果発動]</span>${escapeHtml(text)}`;
+            } else {
+                logEntry.className = 'bg-slate-900 p-2 rounded-xl border border-slate-800 text-xs text-slate-200';
+                logEntry.innerHTML = `<span class="font-bold text-amber-300 mr-2">${escapeHtml(sender)}:</span>${escapeHtml(text)}`;
+            }
+
+            logsContainer.appendChild(logEntry);
+            while (logsContainer.children.length > 120) logsContainer.removeChild(logsContainer.firstChild);
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+
+            // ホストが生成した公開ログは参加者にも配信。受信済みログは再配信しない。
+            if (!fromNetwork && isHost && !isTestMode) {
+                sendToAllClients({ type: 'LOG', sender: sender, text: String(text).slice(0, 500) });
+            }
+        }
+
+        // --- GAME LOOP & RULES ---
+        function startOnlineGame() {
+            const firstStart = gameState.phase === PHASES.DRAW && gameState.roundNumber === 0;
+            const rematchStart = gameState.phase === PHASES.END;
+            if (!isHost || (!firstStart && !rematchStart)) return;
+            const connectedPlayers = gameState.players.filter(p => p.isConnected !== false);
+            if (connectedPlayers.length < MIN_PLAYERS || connectedPlayers.length > MAX_PLAYERS) {
+                gameNotice(`接続中の参加者が不足しています。対戦開始には${MIN_PLAYERS}人以上必要です。`);
+                renderWaitingRoomMembers();
+                return;
+            }
+            if (firstStart || rematchStart) gameState.players = connectedPlayers;
+
+            // ホストが指定した人狼陣営人数。最低1、最大5、村人と占い師の枠は残す。
+            const requestedWolfCount = Number(document.getElementById('wolf-count-setting')?.value || gameState.wolfCountSetting || 2);
+            const wolfCount = Math.max(1, Math.min(5, requestedWolfCount, gameState.players.length - 2));
+            gameState.wolfCountSetting = wolfCount;
+            const wolfRoleTypes = [ROLES.APOSTLE, ROLES.KILLER_BOMB, ROLES.DEATH_OF_10AM, ROLES.PEOPLE_RUN, ROLES.BLACK_MAGE];
+            shuffleArray(wolfRoleTypes);
+            const rolesPool = [...wolfRoleTypes.slice(0, wolfCount), ROLES.SEER];
+            while (rolesPool.length < gameState.players.length) {
+                rolesPool.push(ROLES.CITIZEN);
+            }
+            shuffleArray(rolesPool);
+
+            gameState.roundNumber = 0;
+            gameState.killResolved = false;
+            gameState.ninetyNineCardDrawn = false;
+            gameState.ninetyNineOwnerId = null;
+            gameState.ninetyNineResolvedRound = 0;
+            gameState.ninetyNineCommandRound = 0;
+            gameState.votes = {};
+            gameState.resultTitle = '';
+            gameState.resultSubtitle = '';
+            dismissedAccusationReports.clear();
+            gameState.players.forEach((p, idx) => {
+                p.role = rolesPool[idx];
+                p.isAlive = true;
+                p.isProtected = false;
+                p.hand = getRandomCards(2);
+                p.actionHistory = [];
+                p.privateReports = [];
+                p.restUntilRound = 0;
+                p.restFromRound = 0;
+                p.seerLastRound = 0;
+                p.seerIntel = {};
+                p.death10UsedRound = 0;
+                p.peopleRunUsedRound = 0;
+                p.bombUsedRound = 0;
+                delete p.bombExplodeRound;
+                delete p.bombedBy;
+                delete p.controlledBy99;
+                delete p.ninetyNineOriginalRole;
+            });
+
+            switchScreen('screen-game');
+
+            const me = gameState.players.find(p => p.id === gameState.myId);
+            if (me) {
+                document.getElementById('role-title').innerText = me.role.name;
+                document.getElementById('role-desc').innerText = me.role.desc;
+                document.getElementById('modal-role').classList.remove('hidden');
+            }
+
+            startDrawPhaseHost();
+        }
+
+        function startDrawPhaseHost() {
+            gameState.roundNumber = (gameState.roundNumber || 0) + 1;
+            gameState.phase = PHASES.DRAW;
+            gameState.players.forEach(p => {
+                if (p.isAlive && p.hand.length < 4) {
+                    p.hand.push(...getRandomCards(1));
+                }
+                p.isProtected = false; // Reset shield
+            });
+            broadcastGameState();
+            addLog('SYSTEM', '--- ドローフェーズ開始 ---');
+
+            startTimerHost(5, () => startCardPhaseHost());
+        }
+
+        function startCardPhaseHost() {
+            gameState.phase = PHASES.CARD;
+            broadcastGameState();
+            addLog('SYSTEM', '--- カード使用フェーズ開始 ---');
+
+            startTimerHost(15, () => startPreMeetingPhaseHost());
+        }
+
+        function startPreMeetingPhaseHost() {
+            gameState.phase = PHASES.PRE_MEETING;
+            gameState.preMeetingActionRound = gameState.roundNumber;
+            broadcastGameState();
+            addLog('SYSTEM', '--- 会議前：デスOF10AMの暗殺判定 ---');
+            startTimerHost(12, () => {
+                if (gameState.phase === PHASES.PRE_MEETING) startDiscussionPhaseHost();
+            });
+
+            const deathPlayers = gameState.players.filter(p => p.isAlive && p.role?.id === 'DEATH_OF_10AM');
+            deathPlayers.forEach(p => {
+                if (!p.isAi || p.death10UsedRound === gameState.roundNumber) return;
+                const candidates = gameState.players.filter(t => t.isAlive && t.id !== p.id && !isWolfFaction(t));
+                if (candidates.length && Math.random() < 0.55) {
+                    candidates.sort((a,b) => ((b.role?.id === 'SEER' ? 3 : 0) + Math.random()) - ((a.role?.id === 'SEER' ? 3 : 0) + Math.random()));
+                    processDeath10Action(p.id, candidates[0].id);
+                } else {
+                    processDeath10Action(p.id, null);
+                }
+            });
+
+            const me = gameState.players.find(p => p.id === gameState.myId);
+            if (me && me.isAlive && me.role?.id === 'DEATH_OF_10AM' && me.death10UsedRound !== gameState.roundNumber) {
+                const candidates = gameState.players.filter(p => p.isAlive && p.id !== me.id && !isWolfAllyForMe(p));
+                openVoteModal('デスOF10AM：会議前の暗殺', '会議が始まる前に1人を暗殺するか、今回は何もしないか選んでください。', candidates, 'DEATH10');
+            }
+
+            continuePreMeetingIfReadyHost();
+        }
+
+        function continuePreMeetingIfReadyHost() {
+            if (gameState.phase !== PHASES.PRE_MEETING) return;
+            const waiting = gameState.players.some(p => p.isAlive && p.role?.id === 'DEATH_OF_10AM' && p.death10UsedRound !== gameState.roundNumber);
+            if (!waiting) startDiscussionPhaseHost();
+            else broadcastGameState();
+        }
+
+        function startDiscussionPhaseHost() {
+            if (currentModalCallbackType === 'DEATH10') {
+                document.getElementById('modal-vote').classList.add('hidden');
+                currentModalCallbackType = null;
+            }
+            gameState.phase = PHASES.DISCUSSION;
+            broadcastGameState();
+            addLog('SYSTEM', '--- 口論・審問フェーズ開始 ---');
+            const restingNames = gameState.players.filter(p => p.isAlive && isPlayerResting(p)).map(p => p.name);
+            if (restingNames.length) addLog('SYSTEM', `${restingNames.join('、')} は聖なる告発の代償により、このターンの議論を休みます。`);
+
+            if (isHost) setTimeout(() => simulateAiDiscussion(), 1500);
+
+            startTimerHost(30, () => advanceAfterDiscussionHost());
+        }
+
+        // 処刑（投票による追放）は2ターンに1回。奇数ターンは処刑なしで夜へ。
+        function advanceAfterDiscussionHost() {
+            if (gameState.phase !== PHASES.DISCUSSION) return;
+            if ((gameState.roundNumber || 1) % 2 === 1) {
+                addLog('SYSTEM', `--- 第${gameState.roundNumber}ターン：処刑なし。今夜は襲撃フェーズへ進みます ---`);
+                startKillPhaseHost();
+            } else {
+                startVotePhaseHost();
+            }
+        }
+
+        function startVotePhaseHost() {
+            gameState.phase = PHASES.VOTE;
+            gameState.votes = {};
+            broadcastGameState();
+            addLog('SYSTEM', '--- 投票・追放フェーズ開始（対象を選択してください） ---');
+
+            const restingNames = gameState.players.filter(p => p.isAlive && isPlayerResting(p)).map(p => p.name);
+            if (restingNames.length) addLog('SYSTEM', `${restingNames.join('、')} は代償中のため投票を棄権します。`);
+
+            const eligibleVoters = getEligibleVoters();
+            const me = gameState.players.find(p => p.id === gameState.myId);
+            const active99 = getActiveNinetyNineController();
+            const puppetCount = active99 ? gameState.players.filter(p => p.isAlive && p.controlledBy99 === active99.id).length : 0;
+            const can99Command = !!active99 && puppetCount > 0;
+
+            if (me && eligibleVoters.some(p => p.id === me.id)) {
+                const candidates = gameState.players.filter(p => p.isAlive && p.id !== me.id);
+                if (candidates.length) openVoteModal('追放の選定', '最も不審な対象へ投票してください', candidates, 'VOTE');
+            } else if (me && active99 && me.id === active99.id && puppetCount > 0) {
+                const candidates = gameState.players.filter(p => p.isAlive && p.id !== me.id && p.controlledBy99 !== me.id);
+                if (candidates.length) openVoteModal('ナインティーナイン：操り人形への命令', `配下${puppetCount}人の投票先を指定してください。`, candidates, 'NINETY_NINE_VOTE');
+            }
+
+            // AIのナインティーナインは、配下全員の投票先を一括で指定する。
+            if (active99?.isAi && puppetCount > 0) {
+                const candidates = gameState.players.filter(p => p.isAlive && p.id !== active99.id && p.controlledBy99 !== active99.id);
+                candidates.sort((a,b) => {
+                    const score = p => (isStandardWolf(p) ? 3 : p.role?.id === 'SEER' ? 2 : 0) + Math.random();
+                    return score(b) - score(a);
+                });
+                if (candidates.length) registerNinetyNineCommand(active99.id, candidates[0].id);
+            }
+
+            if (eligibleVoters.length === 0 && !can99Command) {
+                addLog('SYSTEM', '投票できる生存者がいないため、今回は追放なしで夜へ進みます。');
+                startKillPhaseHost();
+                return;
+            }
+
+            // AI投票：休み中のAIは自動棄権し、参加可能なAIだけ投票する。
+            gameState.players.forEach(p => {
+                if (!p.isAi || !p.isAlive || isPlayerResting(p) || isNinetyNinePuppet(p) || isNinetyNineController(p)) return;
+                const others = gameState.players.filter(o => o.isAlive && o.id !== p.id);
+                if (!others.length) return;
+                const score = o => {
+                    let value = Math.random() * 1.2;
+                    const logText = (document.getElementById('chat-logs')?.innerText || '');
+                    if (logText.includes(o.name + 'が怪しい') || logText.includes(o.name + 'の動き')) value += 1.5;
+                    if (isWolfFaction(p) && o.role?.team === 'HUMAN') value += 2.2;
+                    if (p.role?.id === 'SEER' && isWolfFaction(o)) value += 4.5;
+                    if (p.seerIntel?.[o.id] === '人狼陣営') value += 8;
+                    if (o.isProtected) value -= .5;
+                    return value;
+                };
+                others.sort((a,b) => score(b)-score(a));
+                registerVote(p.id, others[0].id);
+            });
+
+            // 未投票の切断者・放置者がいても対戦が止まらないよう、20秒で集計する
+            if (gameState.phase === PHASES.VOTE) {
+                startTimerHost(20, () => {
+                    if (gameState.phase === PHASES.VOTE) processVoteResultsHost();
+                });
+            }
+        }
+
+        function registerVote(voterId, targetId) {
+            const voter = gameState.players.find(p => p.id === voterId);
+            const target = gameState.players.find(p => p.id === targetId);
+            if (!voter || !voter.isAlive || isPlayerResting(voter) || isNinetyNinePuppet(voter) || isNinetyNineController(voter) || !target || !target.isAlive || voterId === targetId) return;
+            if (gameState.phase !== PHASES.VOTE || gameState.votes[voterId]) return;
+            gameState.votes[voterId] = targetId;
+            recordAction(voter, `投票：${target.name}へ投票`, '投票');
+            const eligibleCount = getEligibleVoters().length;
+
+            // 休み中の生存者は棄権扱い。参加資格のある全員が投票したら集計。
+            const regularVoteCount = Object.keys(gameState.votes).filter(id => !id.startsWith('99puppet:')).length;
+            const active99 = getActiveNinetyNineController();
+            const waitingFor99Command = !!active99 && gameState.players.some(p => p.isAlive && p.controlledBy99 === active99.id) && gameState.ninetyNineCommandRound !== gameState.roundNumber;
+            if (eligibleCount > 0 && regularVoteCount >= eligibleCount && !waitingFor99Command) {
+                processVoteResultsHost();
+            }
+        }
+
+        function registerNinetyNineCommand(controllerId, targetId) {
+            if (gameState.phase !== PHASES.VOTE || gameState.ninetyNineCommandRound === gameState.roundNumber) return;
+            const controller = gameState.players.find(p => p.id === controllerId && isNinetyNineController(p) && Number(p.sealedUntilRound || 0) < Number(gameState.roundNumber || 0));
+            const target = gameState.players.find(p => p.id === targetId && p.isAlive && p.id !== controllerId);
+            if (!controller || !target || target.controlledBy99 === controllerId) return;
+            const puppets = gameState.players.filter(p => p.isAlive && p.controlledBy99 === controllerId);
+            if (!puppets.length) return;
+
+            gameState.ninetyNineCommandRound = gameState.roundNumber;
+            puppets.forEach(p => {
+                gameState.votes[`99puppet:${controllerId}:${p.id}`] = targetId;
+                recordAction(p, `操縦者の命令で${target.name}へ投票`, '99命令');
+            });
+            recordAction(controller, `操り人形${puppets.length}人へ${target.name}への投票を命令`, '99命令');
+            addLog('SYSTEM', `ナインティーナインが配下の操り人形に投票命令を下した……`);
+
+            const eligibleCount = getEligibleVoters().length;
+            const regularVoteCount = Object.keys(gameState.votes).filter(id => !id.startsWith('99puppet:')).length;
+            if (eligibleCount === 0 || regularVoteCount >= eligibleCount) {
+                processVoteResultsHost();
+            } else {
+                broadcastGameState();
+            }
+        }
+
+        function processVoteResultsHost() {
+            const voteCounts = {};
+            Object.values(gameState.votes).forEach(tId => {
+                voteCounts[tId] = (voteCounts[tId] || 0) + 1;
+            });
+
+            // ピーポーrunは投票フェーズごとに、自分へ入った票を1票だけ無効化する。
+            gameState.players.filter(p => p.isAlive && p.role?.id === 'PEOPLE_RUN' && p.peopleRunUsedRound !== gameState.roundNumber).forEach(p => {
+                if ((voteCounts[p.id] || 0) > 0) {
+                    voteCounts[p.id] -= 1;
+                    p.peopleRunUsedRound = gameState.roundNumber;
+                    recordAction(p, 'ピーポーrunの能力で自分への投票1票を無効化', '特殊能力');
+                    addLog('SYSTEM', '誰かに投じられた1票が、特殊能力によって無効化された……');
+                    const notice = 'ピーポーrunの能力が発動し、自分に入った投票1票を無効化しました。';
+                    if (p.id === gameState.myId) gameNotice(notice);
+                    else {
+                        const c = hostConnections.get(p.id);
+                        if (c && c.open) { try { c.send({ type: 'PRIVATE_ABILITY_NOTICE', message: notice }); } catch (_) {} }
+                    }
+                }
+            });
+
+            let executedId = null;
+            let maxVotes = 0;
+            let isTie = false;
+
+            Object.entries(voteCounts).forEach(([pId, count]) => {
+                if (count <= 0) return;
+                if (count > maxVotes) {
+                    maxVotes = count;
+                    executedId = pId;
+                    isTie = false;
+                } else if (count === maxVotes) {
+                    isTie = true;
+                }
+            });
+
+            if (isTie || !executedId) {
+                addLog('SYSTEM', '投票結果が同数のため、本日の追放は【執り行われませんでした】。');
+            } else {
+                const executedPlayer = gameState.players.find(p => p.id === executedId);
+                if (executedPlayer) {
+                    const wasNinetyNine = executedPlayer.role?.id === 'NINETY_NINE';
+                    const carriedNinetyNineCard = hasNinetyNineCard(executedPlayer);
+                    executedPlayer.isAlive = false;
+                    if (carriedNinetyNineCard) {
+                        addLog('SYSTEM', '審問の結果、誰かが追放された……しかし、その人物の正体は分からない。');
+                    } else {
+                        addLog('SYSTEM', `審問の結果、${executedPlayer.name} が最多票を獲得し【追放（灰燼）】されました。`);
+                    }
+                    triggerVFX('blood');
+
+                    if (wasNinetyNine) {
+                        releaseNinetyNinePuppets(executedPlayer.id);
+                    } else if (awakenNinetyNine(executedPlayer)) {
+                        if (checkWinConditionHost()) return;
+                        startKillPhaseHost();
+                        return;
+                    } else {
+                        // Check Ashes Card Activation
+                        const ashesCard = executedPlayer.hand.find(c => c.id === 'CARD_ASHES');
+                        if (ashesCard) {
+                            triggerAshesModalHost(executedPlayer);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            if (checkWinConditionHost()) return;
+            startKillPhaseHost();
+        }
+
+        function startKillPhaseHost() {
+            gameState.phase = PHASES.KILL;
+            gameState.killResolved = false;
+            broadcastGameState();
+            addLog('SYSTEM', '--- 夜フェーズ（人狼陣営の特殊能力が発動します） ---');
+
+            // 前のターンにキラーボムが仕掛けられていれば、今夜の開始時に爆発する。
+            if (detonateKillerBombHost()) return;
+            const cursed = gameState.players.find(p => p.isAlive && Number(p.curseExplodeRound || 0) > 0 && p.curseExplodeRound <= gameState.roundNumber);
+            if (cursed) {
+                delete cursed.curseExplodeRound;
+                if (cursed.isProtected) {
+                    cursed.isProtected = false;
+                    addLog('SYSTEM', `${cursed.name}は護符で呪いを退けた！`);
+                } else {
+                    const carriedNinetyNineCard = hasNinetyNineCard(cursed);
+                    cursed.isAlive = false;
+                    addLog('SYSTEM', carriedNinetyNineCard ? '遅延死の呪いが発動し、誰かが倒れた……その人物は分からない。' : `${cursed.name}に刻まれた遅延死の呪いが発動した！`);
+                    triggerVFX('blood');
+                    if (cursed.role?.id === 'NINETY_NINE') releaseNinetyNinePuppets(cursed.id);
+                    else awakenNinetyNine(cursed);
+                }
+                broadcastGameState();
+                if (checkWinConditionHost()) return;
+            }
+
+            const me = gameState.players.find(p => p.id === gameState.myId);
+            if (me && me.isAlive && me.role?.id === 'BLACK_MAGE' && me.blackMagicUsedRound !== gameState.roundNumber) {
+                openBlackMagicSpellModal();
+            } else if (me && me.isAlive && me.role?.id === 'SEER' && me.seerLastRound !== gameState.roundNumber) {
+                const candidates = gameState.players.filter(p => p.isAlive && p.id !== me.id);
+                if (candidates.length) openVoteModal('つかさどる者：夜の占い', '占う相手を1人選んでください。結果はあなただけに届きます。', candidates, 'SEER');
+            } else if (me && me.isAlive && isStandardWolf(me)) {
+                const candidates = gameState.players.filter(p => p.isAlive && p.id !== me.id && !isWolfAllyForMe(p));
+                if (candidates.length) openVoteModal('夜の襲撃', '殺害する相手を1名選んでください', candidates, 'KILL');
+            } else if (me && me.isAlive && me.role?.id === 'KILLER_BOMB' && me.bombUsedRound !== gameState.roundNumber) {
+                const candidates = gameState.players.filter(p => p.isAlive && p.id !== me.id && !isWolfAllyForMe(p));
+                if (candidates.length) openVoteModal('キラーボム：爆弾の設置', '対象は爆弾に気づきません。次のターンの夜に爆発します。', candidates, 'KILLER_BOMB');
+            } else if (me && me.isAlive && me.role?.id === 'NINETY_NINE') {
+                const candidates = gameState.players.filter(p => p.isAlive && p.id !== me.id && !isNinetyNinePuppet(p));
+                if (candidates.length) openVoteModal('デスナインティーナイン：意識の捕獲', '操り人形にする相手を1人選んでください。対象者以外には誰が捕獲されたか分かりません。', candidates, 'NINETY_NINE');
+            }
+
+            // 人間側に操作中の人狼がいなければ、AI人狼陣営が通常の夜襲撃を行う。
+            const humanWolfIsChoosing = gameState.players.some(p => !p.isAi && p.isAlive && isStandardWolf(p));
+            const aiWolf = humanWolfIsChoosing ? null : gameState.players.find(p => p.isAi && p.isAlive && isStandardWolf(p));
+            if (aiWolf) {
+                const victims = gameState.players.filter(p => p.isAlive && p.id !== aiWolf.id && !isWolfFaction(p));
+                victims.sort((a,b) => {
+                    const threat = p => (p.role?.id === 'SEER' ? 10 : 0) + (p.isProtected ? -4 : 0) + Math.random() * 1.5;
+                    return threat(b) - threat(a);
+                });
+                if (victims.length) setTimeout(() => { if (gameState.phase === PHASES.KILL) processKillAction(victims[0].id); }, 1800);
+            }
+
+            // AI占い師は毎夜ひとりを占い、結果を内部メモとして保持する。
+            const aiSeer = gameState.players.find(p => p.isAi && p.isAlive && p.role?.id === 'SEER' && p.seerLastRound !== gameState.roundNumber);
+            if (aiSeer) {
+                const candidates = gameState.players.filter(p => p.isAlive && p.id !== aiSeer.id);
+                candidates.sort((a,b) => ((b.role?.team === 'EVIL' ? 5 : 0) + Math.random()) - ((a.role?.team === 'EVIL' ? 5 : 0) + Math.random()));
+                if (candidates.length) processSeerAction(aiSeer.id, candidates[0].id);
+            }
+
+            // AIキラーボムも次ターン爆発の爆弾を仕掛ける。
+            const aiBomb = gameState.players.find(p => p.isAi && p.isAlive && p.role?.id === 'KILLER_BOMB' && p.bombUsedRound !== gameState.roundNumber);
+            if (aiBomb) {
+                const candidates = gameState.players.filter(p => p.isAlive && p.id !== aiBomb.id && !isWolfFaction(p));
+                if (candidates.length) processKillerBombAction(aiBomb.id, candidates[Math.floor(Math.random() * candidates.length)].id);
+            }
+
+            // AI黒魔術師も毎夜、6種からランダムに1つ選んで発動する。
+            const aiMage = gameState.players.find(p => p.isAi && p.isAlive && p.role?.id === 'BLACK_MAGE' && p.blackMagicUsedRound !== gameState.roundNumber);
+            if (aiMage) {
+                const targets = gameState.players.filter(p => p.isAlive && p.id !== aiMage.id && !isNinetyNinePuppet(p) && !isNinetyNineController(p));
+                if (targets.length) {
+                    const spell = BLACK_MAGIC_SPELLS[Math.floor(Math.random() * BLACK_MAGIC_SPELLS.length)];
+                    const first = targets[Math.floor(Math.random() * targets.length)];
+                    const second = targets.find(p => p.id !== first.id);
+                    if (spell.id === 'SWAP' && second) processBlackMagicAction(aiMage.id, spell.id, first.id, second.id);
+                    else processBlackMagicAction(aiMage.id, spell.id, first.id);
+                }
+            }
+
+            // AIのナインティーナインも夜ごとに1人を捕獲する。
+            const aiNinetyNine = gameState.players.find(p => p.isAi && isNinetyNineController(p));
+            if (aiNinetyNine) {
+                const candidates = gameState.players.filter(p => p.isAlive && p.id !== aiNinetyNine.id && !isNinetyNinePuppet(p));
+                candidates.sort((a, b) => {
+                    const score = p => (isWolfFaction(p) ? 3 : p.role?.id === 'SEER' ? 2 : 0) + Math.random();
+                    return score(b) - score(a);
+                });
+                if (candidates.length) {
+                    const target = candidates[0];
+                    setTimeout(() => { if (gameState.phase === PHASES.KILL) processNinetyNineAttack(aiNinetyNine.id, target.id); }, 1500);
+                }
+            }
+
+            startTimerHost(15, () => {
+                if (gameState.phase === PHASES.KILL) {
+                    if (checkWinConditionHost()) return;
+                    startDrawPhaseHost();
+                }
+            });
+        }
+
+        const BLACK_MAGIC_SPELLS = [
+            { id: 'SWAP', name: '双魂転換', desc: '指定した2人の役職を入れ替える' },
+            { id: 'KILL', name: '黒炎の生贄', desc: '指定した1人を即死させる' },
+            { id: 'SILENCE', name: '沈黙の呪縛', desc: '指定した1人を次の会議で発言不能にする' },
+            { id: 'SEAL', name: '能力封印', desc: '指定した1人の特殊能力を次のターン封じる' },
+            { id: 'WARD', name: '冥府の護符', desc: '指定した1人を今夜の殺害から守る' },
+            { id: 'CURSE', name: '遅延死の呪い', desc: '指定した1人に呪いをかけ、次の夜に死亡させる' }
+        ];
+        let currentBlackMagicSpell = null;
+        let currentBlackMagicTarget = null;
+
+        function openBlackMagicSpellModal() {
+            currentModalCallbackType = 'BLACK_MAGIC_SPELL';
+            currentPendingCard = null;
+            document.getElementById('vote-modal-title').innerText = '黒魔術師：魔術を選択';
+            document.getElementById('vote-modal-desc').innerText = '6種類の魔術から、この夜に使うものを1つ選んでください。';
+            document.getElementById('vote-candidates').innerHTML = BLACK_MAGIC_SPELLS.map((sp, i) => `<button onclick="submitModalSelection('${sp.id}')" class="w-full p-3 bg-slate-950 hover:bg-purple-950 border border-purple-800 rounded-xl text-left text-xs text-purple-100"><b>${i+1}. ${sp.name}</b><div class="text-[10px] text-slate-400 mt-1">${sp.desc}</div></button>`).join('');
+            document.getElementById('modal-vote').classList.remove('hidden');
+        }
+
+        function openBlackMagicTargetModal(second = false) {
+            const me = gameState.players.find(p => p.id === gameState.myId);
+            const candidates = gameState.players.filter(p => p.isAlive && p.id !== me?.id && !isNinetyNinePuppet(p) && !isNinetyNineController(p) && (!second || p.id !== currentBlackMagicTarget));
+            currentModalCallbackType = second ? 'BLACK_MAGIC_TARGET2' : 'BLACK_MAGIC_TARGET';
+            document.getElementById('vote-modal-title').innerText = second ? '入れ替える2人目' : '魔術の対象';
+            document.getElementById('vote-modal-desc').innerText = second ? '役職を入れ替えるもう1人を選んでください。' : (BLACK_MAGIC_SPELLS.find(x=>x.id===currentBlackMagicSpell)?.desc || '対象を選んでください');
+            document.getElementById('vote-candidates').innerHTML = candidates.map(c => `<button onclick="submitModalSelection('${c.id}')" class="w-full py-3 bg-slate-950 hover:bg-purple-950 border border-purple-800 rounded-xl text-xs font-bold text-purple-100 text-left px-4">${escapeHtml(c.name)}</button>`).join('');
+            document.getElementById('modal-vote').classList.remove('hidden');
+        }
+
+        function processBlackMagicAction(playerId, spellId, targetId, target2Id = null) {
+            if (gameState.phase !== PHASES.KILL) return;
+            const mage = gameState.players.find(p => p.id === playerId && p.isAlive && p.role?.id === 'BLACK_MAGE');
+            const target = gameState.players.find(p => p.id === targetId && p.isAlive && p.id !== playerId);
+            const target2 = target2Id ? gameState.players.find(p => p.id === target2Id && p.isAlive && p.id !== playerId && p.id !== targetId) : null;
+            if (!mage || Number(mage.sealedUntilRound || 0) >= Number(gameState.roundNumber || 0) || !target || mage.blackMagicUsedRound === gameState.roundNumber || !BLACK_MAGIC_SPELLS.some(x=>x.id===spellId)) return;
+            if (spellId === 'SWAP' && !target2) return;
+            mage.blackMagicUsedRound = gameState.roundNumber;
+            if (spellId === 'SWAP') {
+                const role = target.role; target.role = target2.role; target2.role = role;
+                recordAction(mage, `${target.name}と${target2.name}の役職を入れ替えた`, '黒魔術');
+                addLog('SYSTEM', '黒魔術が発動し、二つの運命が入れ替わった……');
+                if (target.id === gameState.myId || target2.id === gameState.myId) gameNotice('【双魂転換】あなたの役職が入れ替わりました。現在の役職：'+gameState.players.find(p=>p.id===gameState.myId).role.name);
+            } else if (spellId === 'KILL') {
+                const carriedNinetyNineCard = hasNinetyNineCard(target);
+                target.isAlive = false;
+                recordAction(mage, carriedNinetyNineCard ? '黒炎で誰かを殺害（対象不明）' : `${target.name}を黒炎で殺害`, '黒魔術');
+                addLog('SYSTEM', '黒い炎が走り、誰かが倒れた……'); triggerVFX('blood');
+                if (target.role?.id === 'NINETY_NINE') releaseNinetyNinePuppets(target.id);
+                else if (awakenNinetyNine(target)) { broadcastGameState(); checkWinConditionHost(); return; }
+                else if (target.hand?.some(c=>c.id==='CARD_ASHES')) triggerAshesModalHost(target);
+            } else if (spellId === 'SILENCE') {
+                target.silencedUntilRound = gameState.roundNumber + 1; recordAction(mage, `${target.name}を沈黙させた`, '黒魔術'); addLog('SYSTEM','誰かの声が、呪いによって封じられた……');
+                const c=hostConnections.get(target.id); if(c&&c.open) try{c.send({type:'PRIVATE_ABILITY_NOTICE',message:'黒魔術「沈黙の呪縛」を受けました。次の会議では発言できません。'});}catch(_){}
+            } else if (spellId === 'SEAL') {
+                target.sealedUntilRound = gameState.roundNumber + 1; recordAction(mage, `${target.name}の能力を封印`, '黒魔術'); addLog('SYSTEM','誰かの特殊能力が封じられた……');
+                const c=hostConnections.get(target.id); if(c&&c.open) try{c.send({type:'PRIVATE_ABILITY_NOTICE',message:'黒魔術「能力封印」を受けました。次のターンは特殊能力を使えません。'});}catch(_){}
+            } else if (spellId === 'WARD') {
+                target.isProtected = true; recordAction(mage, `${target.name}に冥府の護符を付与`, '黒魔術'); addLog('SYSTEM','冥府の護符が、誰かを闇から守っている……');
+            } else if (spellId === 'CURSE') {
+                target.curseExplodeRound = gameState.roundNumber + 1; recordAction(mage, `${target.name}に遅延死の呪いを付与`, '黒魔術'); addLog('SYSTEM','誰かに遅れて訪れる死の呪いが刻まれた……');
+            }
+            broadcastGameState();
+            if (checkWinConditionHost()) return;
+        }
+
+        function processSeerAction(playerId, targetId) {
+            if (gameState.phase !== PHASES.KILL) return;
+            const seer = gameState.players.find(p => p.id === playerId && p.isAlive && p.role?.id === 'SEER' && Number(p.sealedUntilRound || 0) < Number(gameState.roundNumber || 0));
+            const target = gameState.players.find(p => p.id === targetId && p.isAlive && p.id !== playerId);
+            if (!seer || !target || seer.seerLastRound === gameState.roundNumber) return;
+            seer.seerLastRound = gameState.roundNumber;
+            const result = target.role?.team === 'EVIL' ? '人狼陣営' : target.role?.team === 'HUMAN' ? '人間陣営' : '第三陣営（人狼ではない）';
+            seer.seerIntel = seer.seerIntel || {};
+            seer.seerIntel[target.id] = result;
+            recordAction(seer, `${target.name}を占った（結果：${result}）`, '占い');
+            const message = { type: 'PRIVATE_SEER_RESULT', round: gameState.roundNumber, targetName: target.name, result };
+            if (seer.isAi) {
+                // AIは投票判断に使えるよう自分の内部メモに保持。公開ログには出さない。
+            } else if (seer.id === gameState.myId) {
+                gameNotice(`【つかさどる者・占い結果】\n第${gameState.roundNumber}ターン\n対象：${target.name}\n判定：${result}`);
+            } else {
+                const c = hostConnections.get(seer.id);
+                if (c && c.open) { try { c.send(message); } catch (_) {} }
+            }
+            broadcastGameState();
+        }
+
+        function processKillerBombAction(playerId, targetId) {
+            if (gameState.phase !== PHASES.KILL) return;
+            const killer = gameState.players.find(p => p.id === playerId && p.isAlive && p.role?.id === 'KILLER_BOMB' && Number(p.sealedUntilRound || 0) < Number(gameState.roundNumber || 0));
+            const target = gameState.players.find(p => p.id === targetId && p.isAlive && p.id !== playerId && !isWolfFaction(p));
+            if (!killer || !target || killer.bombUsedRound === gameState.roundNumber) return;
+            killer.bombUsedRound = gameState.roundNumber;
+            target.bombExplodeRound = gameState.roundNumber + 1;
+            target.bombedBy = killer.id;
+            recordAction(killer, hasNinetyNineCard(target) ? '誰かに爆弾を仕掛けた（対象不明）' : `${target.name}に爆弾を仕掛けた（対象には非公開）`, '爆弾');
+            addLog('SYSTEM', '闇の中で何者かが、誰かに気づかれない爆弾を仕掛けた……');
+            broadcastGameState();
+        }
+
+        function detonateKillerBombHost() {
+            const victim = gameState.players.find(p => p.isAlive && Number(p.bombExplodeRound || 0) > 0 && p.bombExplodeRound <= gameState.roundNumber);
+            if (!victim) return false;
+            const ownerId = victim.bombedBy;
+            delete victim.bombExplodeRound;
+            delete victim.bombedBy;
+            if (victim.isProtected) {
+                victim.isProtected = false;
+                addLog('SYSTEM', `${victim.name}は身代わりの灰によって、爆発から守られた！`);
+                addLog('SYSTEM', '仕掛けられていた爆弾は不発に終わった……');
+            } else {
+                const carriedNinetyNineCard = hasNinetyNineCard(victim);
+                recordAction(gameState.players.find(p => p.id === ownerId), carriedNinetyNineCard ? '仕掛けた爆弾が爆発（対象不明）' : `${victim.name}に仕掛けた爆弾が爆発`, '爆弾');
+                victim.isAlive = false;
+                addLog('SYSTEM', carriedNinetyNineCard ? '仕掛けられていた爆弾が爆発し、誰かが倒れた……その人物は分からない。' : `仕掛けられていた爆弾が爆発！${victim.name}が死亡した。`);
+                triggerVFX('blood');
+                const wasNinetyNine = victim.role?.id === 'NINETY_NINE';
+                if (wasNinetyNine) releaseNinetyNinePuppets(victim.id);
+                else if (awakenNinetyNine(victim)) {
+                    if (checkWinConditionHost()) return true;
+                } else if (victim.hand?.some(c => c.id === 'CARD_ASHES')) {
+                    triggerAshesModalHost(victim);
+                    // 遺灰の選択を待ちつつ、夜フェーズ自体は継続する。
+                }
+            }
+            broadcastGameState();
+            if (checkWinConditionHost()) return true;
+            return false;
+        }
+
+        function processDeath10Action(playerId, targetId = null) {
+            if (gameState.phase !== PHASES.PRE_MEETING) return;
+            const killer = gameState.players.find(p => p.id === playerId && p.isAlive && p.role?.id === 'DEATH_OF_10AM' && Number(p.sealedUntilRound || 0) < Number(gameState.roundNumber || 0));
+            if (!killer || killer.death10UsedRound === gameState.roundNumber) return;
+            killer.death10UsedRound = gameState.roundNumber;
+            if (!targetId) {
+                recordAction(killer, '会議前の暗殺を見送った', 'デスOF10AM');
+                addLog('SYSTEM', 'デスOF10AMが、今朝の暗殺を見送った……');
+                broadcastGameState();
+                continuePreMeetingIfReadyHost();
+                return;
+            }
+            const victim = gameState.players.find(p => p.id === targetId && p.isAlive && p.id !== playerId && !isWolfFaction(p));
+            if (!victim) {
+                killer.death10UsedRound = 0;
+                return;
+            }
+            const carriedNinetyNineCard = hasNinetyNineCard(victim);
+            recordAction(killer, carriedNinetyNineCard ? '会議前に誰かを暗殺（対象不明）' : `${victim.name}を会議前に暗殺`, 'デスOF10AM');
+            if (victim.isProtected) {
+                victim.isProtected = false;
+                addLog('SYSTEM', `${victim.name}は身代わりの灰に守られ、デスOF10AMの暗殺を免れた！`);
+            } else {
+                const wasNinetyNine = victim.role?.id === 'NINETY_NINE';
+                victim.isAlive = false;
+                addLog('SYSTEM', carriedNinetyNineCard ? '会議が始まる前に誰かが暗殺された……しかし、犠牲者は分からない。' : `会議が始まる前に${victim.name}が暗殺された……`);
+                triggerVFX('blood');
+                if (wasNinetyNine) releaseNinetyNinePuppets(victim.id);
+                else if (awakenNinetyNine(victim)) {
+                    if (checkWinConditionHost()) return;
+                } else if (victim.hand?.some(c => c.id === 'CARD_ASHES')) {
+                    broadcastGameState();
+                    triggerAshesModalHost(victim);
+                    return;
+                }
+            }
+            broadcastGameState();
+            if (checkWinConditionHost()) return;
+            continuePreMeetingIfReadyHost();
+        }
+
+        function processKillAction(targetId, killerId = null) {
+            if (gameState.phase !== PHASES.KILL || gameState.killResolved) return;
+            if (killerId) {
+                const killer = gameState.players.find(p => p.id === killerId);
+                if (!killer || !killer.isAlive || Number(killer.sealedUntilRound || 0) >= Number(gameState.roundNumber || 0) || !isStandardWolf(killer) || killer.id === targetId) return;
+            }
+            const victim = gameState.players.find(p => p.id === targetId);
+            if (!victim || !victim.isAlive) return;
+            if (killerId && isWolfFaction(victim)) return;
+            const carriedNinetyNineCard = hasNinetyNineCard(victim);
+            if (killerId) recordAction(gameState.players.find(p => p.id === killerId), carriedNinetyNineCard ? '襲撃対象：不明（99カード起動）' : `襲撃対象：${victim.name}`, '襲撃');
+            gameState.killResolved = true;
+
+            if (victim.isProtected) {
+                addLog('SYSTEM', `${victim.name} は【身代わりの灰】により、襲撃を防ぎ切りました！`);
+                victim.isProtected = false;
+            } else {
+                const wasNinetyNine = victim.role?.id === 'NINETY_NINE';
+                victim.isAlive = false;
+                addLog('SYSTEM', carriedNinetyNineCard ? '闇の中で誰かが襲撃された……しかし、犠牲者の名は分からない。' : `闇の中で静かに ${victim.name} が襲撃され、息絶えました...`);
+                triggerVFX('blood');
+
+                if (wasNinetyNine) {
+                    releaseNinetyNinePuppets(victim.id);
+                } else if (awakenNinetyNine(victim)) {
+                    if (checkWinConditionHost()) return;
+                } else {
+                    const ashesCard = victim.hand.find(c => c.id === 'CARD_ASHES');
+                    if (ashesCard) {
+                        triggerAshesModalHost(victim);
+                        return;
+                    }
+                }
+            }
+
+            if (checkWinConditionHost()) return;
+            broadcastGameState();
+            // 夜の制限時間が終わるまでフェーズを維持し、占い・99捕獲など他の夜能力も処理する。
+        }
+
+        // ナインティーナインの攻撃。対象は死亡扱いにせず、操り人形へ変化させる。
+        function processNinetyNineAttack(controllerId, targetId) {
+            if (gameState.phase !== PHASES.KILL || gameState.ninetyNineResolvedRound === gameState.roundNumber) return;
+            const controller = gameState.players.find(p => p.id === controllerId && isNinetyNineController(p) && Number(p.sealedUntilRound || 0) < Number(gameState.roundNumber || 0));
+            const target = gameState.players.find(p => p.id === targetId);
+            if (!controller || !target || !target.isAlive || target.id === controllerId || isNinetyNinePuppet(target)) return;
+            gameState.ninetyNineResolvedRound = gameState.roundNumber;
+            recordAction(controller, `捕獲対象：${target.name}`, '99捕獲');
+
+            if (target.isProtected) {
+                target.isProtected = false;
+                addLog('SYSTEM', '夜の闇で殺戮兵器の攻撃音が響いたが、身代わりの灰が何者かを守り切った……');
+            } else {
+                target.ninetyNineOriginalRole = target.role ? { ...target.role } : { ...ROLES.CITIZEN };
+                target.controlledBy99 = controller.id;
+                target.role = { ...ROLES.NINETY_NINE_PUPPET };
+                recordAction(target, '意識をナインティーナインに乗っ取られた（操縦者以外には非公開）', '99捕獲');
+                // 誰が捕獲されたかは全体ログに出さない。対象者本人と操縦者だけが気付く。
+                addLog('SYSTEM', 'デスナインティーナインが暗闇で誰かの意識を奪った……犠牲者の名は分からない。');
+            }
+            broadcastGameState();
+            checkWinConditionHost();
+        }
+
+        function triggerAshesModalHost(deadPlayer) {
+            const aliveOthers = gameState.players.filter(p => p.isAlive && p.id !== deadPlayer.id);
+            broadcastGameState();
+            if (aliveOthers.length === 0) {
+                startDrawPhaseHost();
+                return;
+            }
+
+            if (deadPlayer.id === gameState.myId) {
+                openAshesModal(deadPlayer, aliveOthers);
+            } else if (deadPlayer.isAi) {
+                const randomTarget = aliveOthers[Math.floor(Math.random() * aliveOthers.length)];
+                processAshesPass(deadPlayer.id, randomTarget.id);
+            }
+        }
+
+        function processAshesPass(deadId, targetId) {
+            const deadPlayer = gameState.players.find(p => p.id === deadId);
+            const targetPlayer = gameState.players.find(p => p.id === targetId);
+
+            if (deadPlayer && !deadPlayer.isAlive && deadPlayer.hand?.some(c => c.id === 'CARD_ASHES') && targetPlayer && targetPlayer.isAlive && deadPlayer.id !== targetPlayer.id && deadPlayer.role) {
+                const inheritedRole = deadPlayer.ninetyNineOriginalRole || deadPlayer.role;
+                targetPlayer.role = { ...inheritedRole }; // 秘密裏に役職を継承
+                // 継承元・継承先・役職名は全体ログに出さない
+                addLog('SYSTEM', '【聖なる遺灰】誰かの役職が、名もなき生存者へ密かに継承された……');
+                recordAction(deadPlayer, '聖なる遺灰を発動（継承先は非公開）', '遺灰');
+                recordAction(targetPlayer, '聖なる遺灰により役職を継承（継承元は非公開）', '遺灰');
+            } else {
+                addLog('SYSTEM', '【聖なる遺灰】継承は成立しなかった。');
+            }
+
+            if (checkWinConditionHost()) return;
+
+            if (gameState.phase === PHASES.VOTE) startKillPhaseHost();
+            else if (gameState.phase === PHASES.PRE_MEETING) continuePreMeetingIfReadyHost();
+            else if ([PHASES.KILL, PHASES.DISCUSSION, PHASES.DRAW, PHASES.CARD].includes(gameState.phase)) broadcastGameState();
+            else startDrawPhaseHost();
+        }
+
+        function recordAction(player, description, category = '行動') {
+            if (!player) return;
+            player.actionHistory = player.actionHistory || [];
+            player.actionHistory.push(`第${gameState.roundNumber}ターン・${category}：${description}`);
+            if (player.actionHistory.length > 100) player.actionHistory.shift();
+        }
+
+        function processCardUse(playerId, card, targetId) {
+            if (gameState.phase !== PHASES.CARD || !card) return;
+            const player = gameState.players.find(p => p.id === playerId);
+            if (!player || !player.isAlive || isNinetyNinePuppet(player) || isNinetyNineController(player)) return;
+            if (isPlayerResting(player)) return;
+
+            // 手札に実在するカード個体だけを使用可能にする。
+            // 聖なる遺灰はパッシブ専用：カードフェーズでは使用・消費できない。
+            const cIdx = player.hand.findIndex(c => c.instanceId === card.instanceId && c.id === card.id);
+            if (cIdx === -1) return;
+            card = player.hand[cIdx];
+            if (card.id === 'CARD_ASHES' || card.id === 'CARD_NINETY_NINE') return;
+            player.hand.splice(cIdx, 1);
+
+            if (card.id === 'CARD_ACCUSE') {
+                const target = gameState.players.find(p => p.id === targetId && p.isAlive && p.id !== playerId);
+                if (!target) { player.hand.push(card); return; }
+                const history = (target.actionHistory || []).slice(-60);
+                const privateReport = { id: 'RPT-' + Date.now() + '-' + Math.random().toString(36).slice(2,6), round: gameState.roundNumber, targetName: target.name, roleName: target.role?.name || '不明', team: target.role?.team || 'UNKNOWN', history: history.length ? history : ['記録された行動はありません。'] };
+                player.privateReports = player.privateReports || [];
+                player.privateReports.push(privateReport);
+                // カード使用後、同じターンに続く議論・投票から即時適用し、次のターンも休止。
+                player.restFromRound = gameState.roundNumber;
+                player.restUntilRound = gameState.roundNumber + 1;
+                recordAction(player, `聖なる告発を使用（${target.name}を調査）・このターンの残り＋次のターンは議論／投票／カード使用を休止`, 'カード');
+                addLog('CARD', `${player.name} が【聖なる告発】を使用。調査結果は使用者だけに開示。`);
+            } else if (card.id === 'CARD_SHIELD') {
+                recordAction(player, '身代わりの灰を使用', 'カード');
+                player.isProtected = true;
+                addLog('CARD', `${player.name} が【身代わりの灰】を展開。今夜のダメージを防ぎます。`);
+            } else if (card.id === 'CARD_REPLAY') {
+                recordAction(player, '時空の残留を使用', 'カード');
+                const prevRole = gameState.lastHistoryRole[playerId];
+                if (prevRole && !['NINETY_NINE', 'NINETY_NINE_PUPPET'].includes(prevRole.id)) {
+                    player.role = prevRole;
+                    addLog('CARD', `${player.name} が【時空の残留】を発動！前試合の役職（${prevRole.name}）へ先祖返りしました。`);
+                } else if (prevRole) {
+                    addLog('CARD', `${player.name} は【時空の残留】を使用したが、特殊な第三陣営の記憶は再現できなかった。`);
+                } else {
+                    addLog('CARD', `${player.name} は【時空の残留】を使用したが前回の記憶が存在しなかった。`);
+                }
+            }
+
+            broadcastGameState();
+        }
+
+        // --- WIN CONDITIONS & RESULTS ---
+        function checkWinConditionHost() {
+            const alivePlayers = gameState.players.filter(p => p.isAlive);
+            const ninetyNine = getActiveNinetyNineController();
+            if (ninetyNine) {
+                const unconverted = alivePlayers.filter(p => p.id !== ninetyNine.id && p.controlledBy99 !== ninetyNine.id);
+                if (unconverted.length === 0) {
+                    triggerGameOver('デスナインティーナインの単独勝利！', '生存者すべての意識を掌握した。世界はナインティーナインの支配下に落ちた。');
+                    return true;
+                }
+                // 99が活動中は人間・使徒の通常勝利判定を保留。99を倒すか、全員を乗っ取る必要がある。
+                return false;
+            }
+            const aliveEvil = alivePlayers.filter(p => p.role && p.role.team === 'EVIL');
+            const aliveHuman = alivePlayers.filter(p => p.role && p.role.team === 'HUMAN');
+
+            if (aliveEvil.length === 0) {
+                triggerGameOver('人間陣営の完全勝利！', 'すべての【人狼陣営】を審問により排除しました。');
+                return true;
+            } else if (aliveEvil.length >= aliveHuman.length) {
+                triggerGameOver('人狼陣営の完全勝利！', '生存者の半数以上が人狼陣営となりました。闇が世界を呑み込みます。');
+                return true;
+            }
+            return false;
+        }
+
+        function triggerGameOver(title, subtitle) {
+            gameState.phase = PHASES.END;
+            gameState.resultTitle = title;
+            gameState.resultSubtitle = subtitle;
+            clearInterval(gameState.timerInterval);
+
+            // Save history for Replay Card
+            gameState.players.forEach(p => {
+                gameState.lastHistoryRole[p.id] = p.role;
+            });
+
+            broadcastGameState();
+
+            document.getElementById('result-title').innerText = title;
+            document.getElementById('result-subtitle').innerText = subtitle;
+
+            const summaryContainer = document.getElementById('result-roles-summary');
+            summaryContainer.innerHTML = gameState.players.map(p => `
+                <div class="flex justify-between items-center py-1 border-b border-slate-900 last:border-0">
+                    <span class="font-bold text-slate-200">${escapeHtml(p.name)}</span>
+                    <span class="font-mono ${p.role?.team === 'EVIL' ? 'text-rose-400' : 'text-amber-300'}">${escapeHtml(p.role?.name || '役職不明')} (${p.isAlive ? '生存' : '死亡'})</span>
+                </div>
+            `).join('');
+
+            document.getElementById('modal-result').classList.remove('hidden');
+        }
+
+        function rematchGame() {
+            document.getElementById('modal-result').classList.add('hidden');
+            if (isHost) startOnlineGame();
+        }
+
+        function leaveRoom() {
+            if (conn && conn.open) { try { conn.send({ type: 'LEAVE' }); } catch (_) {} }
+            location.reload();
+        }
+
+        // --- UI DRAWING & MODALS ---
+        function dismissAccusationReport(reportId) {
+            dismissedAccusationReports.add(String(reportId));
+            renderAccusationReports();
+        }
+
+        function renderAccusationReports() {
+            const panel = document.getElementById('accusation-report-panel');
+            const list = document.getElementById('accusation-report-list');
+            if (!panel || !list) return;
+
+            const me = gameState.players.find(p => p.id === gameState.myId);
+            const reports = (me?.privateReports || []).filter(r => r && !dismissedAccusationReports.has(String(r.id)));
+            if (!reports.length) {
+                panel.classList.add('hidden');
+                list.innerHTML = '';
+                return;
+            }
+
+            panel.classList.remove('hidden');
+            list.innerHTML = reports.slice().reverse().map(report => {
+                const faction = report.team === 'EVIL' ? '人狼陣営' : report.team === 'HUMAN' ? '人間陣営' : report.team === 'NINETY_NINE' ? '第三陣営' : '判定不明';
+                const safeId = String(report.id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+                const history = Array.isArray(report.history) && report.history.length
+                    ? report.history
+                    : ['記録された行動はありません。'];
+                return `
+                    <article class="rounded-xl border border-amber-900/60 bg-slate-950/80 p-3 space-y-3">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <div class="text-[10px] text-amber-500 font-mono">第${Number(report.round) || 0}ターンの調査記録</div>
+                                <div class="text-sm font-bold text-slate-100 mt-1">対象：${escapeHtml(report.targetName || '不明')}</div>
+                                <div class="text-xs text-amber-200 mt-1">正体：${escapeHtml(report.roleName || '不明')}</div>
+                                <div class="text-[10px] text-rose-300 mt-1">所属：${faction}</div>
+                            </div>
+                            <button type="button" onclick="dismissAccusationReport('${safeId}')" class="shrink-0 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 text-[10px] text-slate-300">確認して閉じる</button>
+                        </div>
+                        <div class="rounded-lg bg-black/30 border border-slate-800 p-3">
+                            <div class="text-[10px] font-bold text-slate-400 mb-2">過去の行動履歴</div>
+                            <ol class="list-decimal list-inside space-y-1.5 text-xs leading-relaxed text-slate-300">${history.map(item => `<li class="break-words">${escapeHtml(item)}</li>`).join('')}</ol>
+                        </div>
+                        <div class="text-[10px] leading-relaxed text-amber-300/90">代償：このターンの残りと次のターンは、議論・投票・カード使用を休止します。</div>
+                    </article>`;
+            }).join('');
+        }
+
+        function updateGameUI() {
+            document.getElementById('current-phase-display').innerText = gameState.phase;
+            const aliveCount = gameState.players.filter(p => p.isAlive).length;
+            document.getElementById('alive-count').innerText = aliveCount;
+            const turnDisplay = document.getElementById('turn-number');
+            if (turnDisplay) turnDisplay.innerText = gameState.roundNumber || 0;
+            const hints = {
+                [PHASES.DRAW]: 'カードを補充中。次のフェーズへ進もう。',
+                [PHASES.CARD]: '手札を選んで発動！防御カードは襲撃前に。',
+                [PHASES.PRE_MEETING]: '会議前の暗殺フェーズ。デスOF10AMは暗殺か見送りを選べる。',
+                [PHASES.DISCUSSION]: (gameState.roundNumber || 1) % 2 === 1 ? `第${gameState.roundNumber}ターン：30秒議論。このターンは処刑なし。` : `第${gameState.roundNumber}ターン：30秒議論。議論後に投票・処刑を行う。` ,
+                [PHASES.VOTE]: '追放する相手を選択。投票は慎重に。',
+                [PHASES.KILL]: '夜の襲撃・爆弾設置・占いのフェーズ。',
+                [PHASES.END]: '決着。役職と勝敗を振り返ろう。'
+            };
+            const me = gameState.players.find(p => p.id === gameState.myId);
+            const roleName = document.getElementById('my-role-name');
+            const roleTeam = document.getElementById('my-role-team');
+            if (roleName) roleName.innerText = me?.role?.name || '配役待機中';
+            if (roleTeam) roleTeam.innerText = me?.role ? (me.role.team === 'EVIL' ? '人狼陣営' : me.role.team === 'NINETY_NINE' ? '第三陣営' : '人間陣営') : 'ゲーム開始後に表示';
+            const resting = isPlayerResting(me);
+            const phaseHint = hints[gameState.phase] || '指示を待っています...';
+            const restFrom = me?.restFromRound || ((me?.restUntilRound || 0) - 1);
+            const restUntil = me?.restUntilRound || 0;
+            document.getElementById('phase-instruction').innerText = resting
+                ? `聖なる告発の代償中：第${restFrom}〜${restUntil}ターンはチャット・議論・投票・カード使用が禁止です。${gameState.phase === PHASES.VOTE ? '\nこの投票は自動棄権になります。' : ''}\n${phaseHint}`
+                : phaseHint;
+            const chatInput = document.getElementById('chat-input');
+            const chatSend = document.getElementById('chat-send-button');
+            const restStatus = document.getElementById('rest-status');
+            const ninetyNineSilenced = isNinetyNinePuppet(me) || isNinetyNineController(me);
+            const magicallySilenced = !!me && Number(me.silencedUntilRound || 0) >= Number(gameState.roundNumber || 0) && gameState.phase === PHASES.DISCUSSION;
+            const chatForbidden = resting || ninetyNineSilenced || magicallySilenced;
+            if (chatInput) {
+                chatInput.disabled = chatForbidden;
+                chatInput.placeholder = resting ? '聖なる告発の代償中：チャット禁止' : ninetyNineSilenced ? '支配下のため発言できません' : magicallySilenced ? '沈黙の呪いにより発言できません' : '主張・弁明を入力...';
+            }
+            if (chatSend) chatSend.disabled = chatForbidden;
+            if (restStatus) {
+                const showRest = resting;
+                restStatus.classList.toggle('hidden', !showRest);
+                restStatus.innerText = showRest
+                    ? `聖なる告発の代償：第${restFrom}〜${restUntil}ターンはチャット・議論・投票・カード使用を禁止中。${gameState.phase === PHASES.DISCUSSION ? '発言できません。' : gameState.phase === PHASES.VOTE ? 'この投票は自動棄権です。' : 'チャットも送信できません。'}`
+                    : '';
+            }
+            const phaseBtn = document.getElementById('btn-phase-action');
+            if (phaseBtn) {
+                phaseBtn.disabled = !isHost || [PHASES.PRE_MEETING, PHASES.VOTE, PHASES.KILL, PHASES.END].includes(gameState.phase);
+                phaseBtn.classList.toggle('opacity-40', phaseBtn.disabled);
+                phaseBtn.innerText = gameState.phase === PHASES.DRAW ? 'カード使用へ' :
+                    gameState.phase === PHASES.CARD ? '会議前へ進む' :
+                    gameState.phase === PHASES.DISCUSSION ? ((gameState.roundNumber || 1) % 2 === 1 ? '処刑なし・夜へ進む' : '投票へ進む') : '自動進行中';
+            }
+
+            renderPlayersBoard();
+            renderHandCards();
+            renderAccusationReports();
+        }
+
+        function renderWaitingRoomMembers() {
+            const container = document.getElementById('room-members-list');
+            const countDisplay = document.getElementById('current-wait-count');
+            const startBtn = document.getElementById('btn-start-online');
+
+            const connectedCount = gameState.players.filter(p => p.isConnected !== false).length;
+            if (countDisplay) countDisplay.innerText = connectedCount;
+
+            if (startBtn) {
+                const warning = document.getElementById('member-count-warning');
+                if (!isHost) {
+                    startBtn.disabled = true;
+                    warning.classList.add('hidden');
+                } else if (connectedCount >= MIN_PLAYERS && connectedCount <= MAX_PLAYERS) {
+                    startBtn.disabled = false;
+                    warning.classList.add('hidden');
+                } else {
+                    startBtn.disabled = true;
+                    warning.classList.remove('hidden');
+                    warning.querySelector('span').innerHTML = `対戦開始には<strong>接続中の参加者が最低 ${MIN_PLAYERS} 名</strong>必要です。現在 ${connectedCount} 名です。`;
+                }
+            }
+
+            if (!container) return;
+            container.innerHTML = gameState.players.map(p => `
+                <div class="flex justify-between items-center py-1.5 px-3 bg-slate-900/60 rounded-lg border border-slate-800 text-xs">
+                    <span class="text-slate-200 font-bold">${escapeHtml(p.name)} ${p.id === gameState.myId ? '(あなた)' : ''}</span>
+                    <span class="text-[10px] font-mono ${p.isConnected === false ? 'text-rose-400' : 'text-emerald-400'}">${p.isHost ? '[HOST]' : '[MEMBER]'} ${p.isConnected === false ? '切断中' : '接続中'}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderPlayersBoard() {
+            const container = document.getElementById('players-board');
+            if (!container) return;
+
+            const localMe = gameState.players.find(p => p.id === gameState.myId);
+            container.innerHTML = gameState.players.map(p => {
+                const isMe = p.id === gameState.myId;
+                const isMyPuppet = localMe?.role?.id === 'NINETY_NINE' && p.controlledBy99 === localMe.id;
+                return `
+                    <div class="glass-card p-4 rounded-2xl border ${p.isAlive ? 'border-slate-800' : 'border-rose-950 opacity-40 bg-slate-950'} relative overflow-hidden transition-all">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <span class="text-xs font-bold ${p.isAlive ? 'text-amber-200' : 'text-slate-500 line-through'}">${escapeHtml(p.name)}</span>
+                                ${isMe ? '<span class="text-[10px] text-sky-400 ml-1 font-bold">(あなた)</span>' : ''}
+                                <div class="text-[10px] text-slate-400 mt-1">手札枚数: ${p.hand.length} 枚</div>
+                                ${isMyPuppet ? '<div class="text-[10px] text-rose-300 mt-1 font-bold">99の操り人形・支配中</div>' : ''}
+                            </div>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${p.isAlive ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-900'}">
+                                ${p.isAlive ? '生存' : '灰燼'}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderHandCards() {
+            const container = document.getElementById('hand-cards-container');
+            if (!container) return;
+
+            const me = gameState.players.find(p => p.id === gameState.myId);
+            if (!me || !me.isAlive) {
+                container.innerHTML = `<div class="col-span-4 text-center py-6 text-xs text-slate-500">死亡中のためカード操作不可</div>`;
+                return;
+            }
+            if (isNinetyNinePuppet(me) || isNinetyNineController(me)) {
+                container.innerHTML = `<div class="col-span-full text-center py-6 text-xs text-rose-300">ナインティーナインの支配下。通常のカード操作はできない。</div>`;
+                return;
+            }
+
+            if (isPlayerResting(me)) {
+                container.innerHTML = `<div class="col-span-full text-center py-6 text-xs text-amber-300">聖なる告発の代償中。第${me.restFromRound || (me.restUntilRound - 1)}〜${me.restUntilRound}ターンはカードを使用できません。</div>`;
+                return;
+            }
+            if (!me.hand.length) {
+                container.innerHTML = '<div class="col-span-full text-center py-6 text-xs text-slate-500">手札は空。次のドローを待とう。</div>';
+                return;
+            }
+            container.innerHTML = me.hand.map(card => {
+                const isPassive = ['CARD_ASHES', 'CARD_NINETY_NINE'].includes(card.id);
+                return `
+                <button type="button" ${isPassive ? 'disabled aria-disabled="true"' : `onclick="playCard('${card.instanceId}')"`} class="text-left glass-card p-3 rounded-xl border rarity-${card.rarity} ${isPassive ? 'opacity-75 cursor-not-allowed border-amber-700/50' : 'hover:scale-[1.02] hover:bg-slate-800 transition-all cursor-pointer'} flex flex-col justify-between min-h-[125px]">
+                    <div>
+                        <span class="text-[9px] font-mono uppercase text-amber-400 block">${card.rarity}${isPassive ? ' / PASSIVE' : ''}</span>
+                        <h5 class="text-xs font-bold text-slate-100">${escapeHtml(card.name)}</h5>
+                        <p class="text-[10px] text-slate-400 mt-1 leading-tight">${escapeHtml(card.desc)}</p>
+                    </div>
+                    <span class="mt-3 block w-full py-1 text-center ${isPassive ? 'bg-slate-700/40 border border-slate-600/50 text-slate-300' : 'bg-amber-500/10 border border-amber-500/30 text-amber-300'} rounded text-[10px] font-bold">${isPassive ? (card.id === 'CARD_NINETY_NINE' ? '死亡時に起動・超レア' : '死亡時に自動発動・使用不可') : '発動する'}</span>
+                </button>`;
+            }).join('');
+        }
+
+        function playCard(instanceId) {
+            if (gameState.phase !== PHASES.CARD) {
+                gameNotice('カードは「カード使用フェーズ」でのみプレイ可能です。');
+                return;
+            }
+            const me = gameState.players.find(p => p.id === gameState.myId);
+            if (!me || !me.isAlive) return;
+
+            const card = me.hand.find(c => c.instanceId === instanceId);
+            if (!card) return;
+            if (isNinetyNinePuppet(me) || isNinetyNineController(me)) return;
+            if (card.id === 'CARD_ASHES') {
+                gameNotice('聖なる遺灰はパッシブカードです。カードフェーズでは使用できず、死亡時に自動発動します。');
+                return;
+            }
+            if (card.id === 'CARD_NINETY_NINE') {
+                gameNotice('99カードは超レアなパッシブカードです。所持者が死亡すると自動で起動します。');
+                return;
+            }
+            if (isPlayerResting(me)) { gameNotice(`聖なる告発の代償中：第${me.restFromRound || (me.restUntilRound - 1)}〜${me.restUntilRound}ターンは議論・投票・カード使用を休みます。`); return; }
+
+            if (card.id === 'CARD_ACCUSE') {
+                const candidates = gameState.players.filter(p => p.isAlive && p.id !== me.id);
+                openVoteModal('告発対象の選択', '手札枚数を確認したい相手を選択', candidates, 'CARD_INSPECT', card);
+            } else {
+                sendAction({ type: 'ACTION_CARD', playerId: me.id, card: card, targetId: null });
+            }
+        }
+
+        function simulateAiDiscussion() {
+            const aiPlayers = gameState.players.filter(p => p.isAi && p.isAlive && !isPlayerResting(p) && !isNinetyNinePuppet(p) && !isNinetyNineController(p));
+            if (!aiPlayers.length) return;
+            // AIごとに立場・役職・生存状況に応じた発言をする
+            aiPlayers.forEach((speaker, i) => {
+                setTimeout(() => {
+                    if (gameState.phase !== PHASES.DISCUSSION || !speaker.isAlive || isPlayerResting(speaker) || isNinetyNinePuppet(speaker) || isNinetyNineController(speaker)) return;
+                    const suspects = gameState.players.filter(p => p.isAlive && p.id !== speaker.id);
+                    const target = suspects[Math.floor(Math.random() * suspects.length)];
+                    let line;
+                    if (isWolfFaction(speaker)) {
+                        line = [
+                            `${target?.name || '誰か'}が怪しい。先に追放しておきたい。`,
+                            '占い結果を持っている人はいないのか？',
+                            '今は票を割らせた方がよさそうだな。'
+                        ][Math.floor(Math.random() * 3)];
+                    } else if (speaker.role?.id === 'SEER') {
+                        const knownEvil = Object.keys(speaker.seerIntel || {}).find(id => speaker.seerIntel[id] === '人狼陣営');
+                        const knownTarget = gameState.players.find(p => p.id === knownEvil && p.isAlive);
+                        const suspects = knownTarget ? [knownTarget] : [];
+                        line = suspects.length
+                            ? `推理に確信がある。${suspects[0].name}を重点的に審問したい。`
+                            : ['情報を整理しよう。発言と投票先の一貫性を見たい。','まだ断定はできない。誰が誰をかばっている？','票を急ぐより、理由を聞いてから判断したい。'][Math.floor(Math.random()*3)];
+                    } else {
+                        const alive = gameState.players.filter(p => p.isAlive && p.id !== speaker.id);
+                        const evidenceTarget = alive[Math.floor(Math.random() * alive.length)];
+                        line = isWolfFaction(speaker)
+                            ? [`${target?.name || '誰か'}の発言が不自然だ。`, '今は情報を出しすぎない方がいい。', '票を一人に集中させない手もある。'][Math.floor(Math.random()*3)]
+                            : [ `${target?.name || '誰か'}の動きが気になる。理由を聞きたい。`,
+                                '使徒を逃すと危険だ。発言と投票の矛盾を探そう。',
+                                '自分は無実だ。根拠のある推理を頼む。',
+                                `${evidenceTarget?.name || target?.name || '誰か'}の行動をもう少し確認したい。` ][Math.floor(Math.random()*4)];
+                    }
+                    broadcastMessage(speaker.name, line);
+                }, 900 * (i + 1));
+            });
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            if (!input) return;
+            const text = input.value.trim();
+            if (!text) return;
+
+            const me = gameState.players.find(p => p.id === gameState.myId);
+            if (!me || !me.isAlive) return;
+            if (isNinetyNinePuppet(me) || isNinetyNineController(me)) {
+                gameNotice('ナインティーナインの支配下にあるため、通常の発言はできません。');
+                input.value = '';
+                return;
+            }
+            if (isPlayerResting(me)) {
+                gameNotice(`聖なる告発の代償中（第${me.restFromRound || (me.restUntilRound - 1)}〜${me.restUntilRound}ターン）のため、チャットを送信できません。`);
+                input.value = '';
+                return;
+            }
+
+            if (isHost) broadcastMessage(me.name, text);
+            else if (conn && conn.open) {
+                conn.send({ type: 'CHAT', sender: me.name, text: text });
+            } else {
+                gameNotice('ホストとの接続が切れています。発言を送信できませんでした。');
+            }
+
+            input.value = '';
+        }
+
+        function requestNextPhase() {
+            if (!isHost) return;
+            if (gameState.phase === PHASES.CARD) {
+                startPreMeetingPhaseHost();
+            } else if (gameState.phase === PHASES.DISCUSSION) {
+                advanceAfterDiscussionHost();
+            } else if (gameState.phase === PHASES.DRAW) {
+                startCardPhaseHost();
+            }
+        }
+
+        function startTimerHost(seconds, onComplete) {
+            clearInterval(gameState.timerInterval);
+            gameState.timer = seconds;
+
+            const timerSec = document.getElementById('timer-sec');
+            if (timerSec) timerSec.innerText = gameState.timer;
+            sendToAllClients({ type: 'TIMER', seconds: gameState.timer });
+
+            gameState.timerInterval = setInterval(() => {
+                gameState.timer--;
+                const secEl = document.getElementById('timer-sec');
+                if (secEl) secEl.innerText = gameState.timer;
+                sendToAllClients({ type: 'TIMER', seconds: gameState.timer });
+
+                if (gameState.timer <= 0) {
+                    clearInterval(gameState.timerInterval);
+                    if (onComplete) onComplete();
+                }
+            }, 1000);
+        }
+
+        function sendAction(actionObj) {
+            if (isHost) {
+                handleHostData(null, actionObj);
+                return;
+            }
+            if (conn && conn.open) {
+                try { conn.send(actionObj); }
+                catch (e) {
+                    console.error('[ECHO action send]', e);
+                    gameNotice('操作を送信できませんでした。接続状態を確認してください。');
+                }
+            } else {
+                setNetworkStatus('切断', false); gameNotice('ホストとの接続が切れています。この対戦には再参加できません。新しいルームを作成するか、別のルームに参加してください。');
+            }
+        }
+
+        // --- IN-GAME NOTICE QUEUE (browser alert is not used) ---
+        const gameNoticeQueue = [];
+        let gameNoticeOpen = false;
+
+        function gameNotice(message, title = 'ゲーム通知') {
+            gameNoticeQueue.push({ message: String(message ?? ''), title: String(title || 'ゲーム通知') });
+            showNextGameNotice();
+        }
+
+        function showNextGameNotice() {
+            if (gameNoticeOpen || gameNoticeQueue.length === 0) return;
+            const modal = document.getElementById('modal-notice');
+            const titleEl = document.getElementById('notice-title');
+            const messageEl = document.getElementById('notice-message');
+            if (!modal || !titleEl || !messageEl) return;
+
+            const next = gameNoticeQueue.shift();
+            titleEl.textContent = next.title;
+            messageEl.textContent = next.message;
+            modal.classList.remove('hidden');
+            gameNoticeOpen = true;
+            const closeButton = document.getElementById('notice-close-button');
+            if (closeButton) closeButton.focus();
+        }
+
+        function closeGameNotice() {
+            const modal = document.getElementById('modal-notice');
+            if (modal) modal.classList.add('hidden');
+            gameNoticeOpen = false;
+            // 次の通知も同じゲーム画面内に順番に表示する。
+            setTimeout(showNextGameNotice, 80);
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && gameNoticeOpen) {
+                event.preventDefault();
+                closeGameNotice();
+            }
+        });
+
+        // --- MODAL DIALOG CONTROLLERS ---
+        let currentModalCallbackType = null;
+        let currentPendingCard = null;
+
+        function openVoteModal(title, desc, candidates, callbackType, pendingCard = null) {
+            currentModalCallbackType = callbackType;
+            currentPendingCard = pendingCard;
+
+            document.getElementById('vote-modal-title').innerText = title;
+            document.getElementById('vote-modal-desc').innerText = desc;
+
+            const container = document.getElementById('vote-candidates');
+            container.innerHTML = candidates.map(c => `
+                <button onclick="submitModalSelection('${c.id}')" class="w-full py-3 bg-slate-950 hover:bg-rose-950 border border-slate-800 hover:border-rose-600 rounded-xl text-xs font-bold text-amber-200 transition-all flex items-center justify-between px-4">
+                    <span>${escapeHtml(c.name)}</span>
+                    <i class="fa-solid fa-chevron-right text-slate-500"></i>
+                </button>
+            `).join('');
+            if (callbackType === 'DEATH10') {
+                container.innerHTML += `<button onclick="submitModalSelection('')" class="w-full py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl text-xs font-bold text-slate-200 transition-all">今回は何もしない</button>`;
+            }
+
+            document.getElementById('modal-vote').classList.remove('hidden');
+        }
+
+        function submitModalSelection(targetId) {
+            document.getElementById('modal-vote').classList.add('hidden');
+            const meId = gameState.myId;
+
+            if (currentModalCallbackType === 'BLACK_MAGIC_SPELL') {
+                currentBlackMagicSpell = targetId; currentBlackMagicTarget = null; openBlackMagicTargetModal(false); return;
+            } else if (currentModalCallbackType === 'BLACK_MAGIC_TARGET') {
+                currentBlackMagicTarget = targetId;
+                if (currentBlackMagicSpell === 'SWAP') { openBlackMagicTargetModal(true); return; }
+                sendAction({ type:'ACTION_BLACK_MAGIC', playerId:meId, spellId:currentBlackMagicSpell, targetId:targetId });
+                currentBlackMagicSpell = null; currentBlackMagicTarget = null;
+            } else if (currentModalCallbackType === 'BLACK_MAGIC_TARGET2') {
+                sendAction({ type:'ACTION_BLACK_MAGIC', playerId:meId, spellId:currentBlackMagicSpell, targetId:currentBlackMagicTarget, target2Id:targetId });
+                currentBlackMagicSpell = null; currentBlackMagicTarget = null;
+            } else if (currentModalCallbackType === 'VOTE') {
+                sendAction({ type: 'ACTION_VOTE', voterId: meId, targetId: targetId });
+            } else if (currentModalCallbackType === 'KILL') {
+                sendAction({ type: 'ACTION_KILL', targetId: targetId, killerId: meId });
+            } else if (currentModalCallbackType === 'SEER') {
+                sendAction({ type: 'ACTION_SEER', playerId: meId, targetId: targetId });
+            } else if (currentModalCallbackType === 'KILLER_BOMB') {
+                sendAction({ type: 'ACTION_KILLER_BOMB', playerId: meId, targetId: targetId });
+            } else if (currentModalCallbackType === 'DEATH10') {
+                sendAction({ type: 'ACTION_DEATH10', playerId: meId, targetId: targetId || null });
+            } else if (currentModalCallbackType === 'NINETY_NINE') {
+                sendAction({ type: 'ACTION_NINETY_NINE', targetId: targetId, controllerId: meId });
+            } else if (currentModalCallbackType === 'NINETY_NINE_VOTE') {
+                sendAction({ type: 'ACTION_99_COMMAND', targetId: targetId, controllerId: meId });
+            } else if (currentModalCallbackType === 'CARD_INSPECT' && currentPendingCard) {
+                sendAction({ type: 'ACTION_CARD', playerId: meId, card: currentPendingCard, targetId: targetId });
+            }
+        }
+
+        function openAshesModal(deadPlayer, candidates) {
+            document.getElementById('ashes-role-name').innerText = deadPlayer.role ? deadPlayer.role.name : '宿命';
+            const container = document.getElementById('ashes-candidates');
+
+            container.innerHTML = candidates.map(c => `
+                <button onclick="submitAshesPass('${deadPlayer.id}', '${c.id}')" class="w-full py-3 bg-rose-950 hover:bg-rose-900 border border-rose-600 rounded-xl text-xs font-bold text-amber-200 transition-all flex items-center justify-between px-4">
+                    <span>${escapeHtml(c.name)} に遺言を押し付ける</span>
+                    <i class="fa-solid fa-fire-flame-curved text-amber-400"></i>
+                </button>
+            `).join('');
+
+            document.getElementById('modal-ashes').classList.remove('hidden');
+        }
+
+        function submitAshesPass(deadId, targetId) {
+            document.getElementById('modal-ashes').classList.add('hidden');
+            sendAction({ type: 'ACTION_ASHES', deadId: deadId, targetId: targetId });
+        }
+
+        function toggleMobileMode() {
+            mobileModeManualOverride = true;
+            document.body.classList.toggle('force-mobile');
+            const enabled = document.body.classList.contains('force-mobile');
+            const button = document.getElementById('mobile-mode-toggle');
+            if (button) button.innerText = enabled ? 'スマホモード ON' : 'スマホモード OFF';
+        }
+
+        function showMyRole() {
+            const me = gameState.players.find(p => p.id === gameState.myId);
+            if (!me?.role) { gameNotice('まだ役職は決まっていません。'); return; }
+            document.getElementById('role-title').innerText = me.role.name;
+            document.getElementById('role-desc').innerText = me.role.desc;
+            document.getElementById('role-icon').innerHTML = `<i class=\"fa-solid ${me.role.icon || 'fa-user'}\"></i>`;
+            document.getElementById('modal-role').classList.remove('hidden');
+        }
+
+        function closeRoleModal() {
+            document.getElementById('modal-role').classList.add('hidden');
+        }
+
+        function triggerVFX(type, fromNetwork = false) {
+            const body = document.body;
+            if (type === 'blood') {
+                body.classList.add('blood-flash');
+                setTimeout(() => body.classList.remove('blood-flash'), 900);
+            }
+            if (!fromNetwork && isHost && !isTestMode) sendToAllClients({ type: 'VFX', vfxType: type });
+        }
+
+        function getRandomCards(count) {
+            const cards = [];
+            for (let i = 0; i < count; i++) {
+                const card = weightedRandomCard();
+                cards.push({ ...card, instanceId: 'card_' + Math.random().toString(36).substring(2, 9) });
+            }
+            return cards;
+        }
+
+        function weightedRandomCard() {
+            const special99 = ACTION_CARDS.find(c => c.id === 'CARD_NINETY_NINE');
+            // 99カードは1試合に最大1枚。1回のドローにつき10%の確率。
+            if (special99 && !gameState.ninetyNineCardDrawn && Math.random() < 0.10) {
+                gameState.ninetyNineCardDrawn = true;
+                return special99;
+            }
+            const normalCards = ACTION_CARDS.filter(c => c.id !== 'CARD_NINETY_NINE' && c.weight > 0);
+            const totalWeight = normalCards.reduce((sum, c) => sum + c.weight, 0);
+            let random = Math.random() * totalWeight;
+            for (const c of normalCards) {
+                if (random < c.weight) return c;
+                random -= c.weight;
+            }
+            return normalCards[0];
+        }
+
+        function shuffleArray(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initializeRoomEntry);
+        else initializeRoomEntry();
+    </script>
+</body>
+</html>
